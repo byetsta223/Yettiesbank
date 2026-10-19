@@ -590,3 +590,29 @@ final class BankStore: ObservableObject {
         ]
     }
 }
+// MARK: - Statement export
+
+extension BankStore {
+    /// Builds a CSV statement for an account covering the calendar month that contains `month`.
+    func statementCSV(for accountID: UUID, month: Date) -> String {
+        let calendar = Calendar.current
+        guard let interval = calendar.dateInterval(of: .month, for: month) else { return "" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        var rows = ["Date,Merchant,Category,Amount"]
+        let monthTransactions = transactions(for: accountID)
+            .filter { interval.contains($0.date) }
+            .sorted { $0.date < $1.date }
+
+        for tx in monthTransactions {
+            rows.append("\(formatter.string(from: tx.date)),\(Self.csvEscaped(tx.merchant)),\(Self.csvEscaped(tx.category)),\(String(format: "%.2f", tx.amount))")
+        }
+        return rows.joined(separator: "\n")
+    }
+
+    private static func csvEscaped(_ field: String) -> String {
+        guard field.contains(",") || field.contains("\"") || field.contains("\n") else { return field }
+        return "\"\(field.replacingOccurrences(of: "\"", with: "\"\""))\""
+    }
+}

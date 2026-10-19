@@ -297,6 +297,8 @@ struct AccountDetailView: View {
     @ObservedObject var store: BankStore
     let account: BankAccount
 
+    @State private var showExport = false
+
     var body: some View {
         List {
             Section {
@@ -323,6 +325,123 @@ struct AccountDetailView: View {
         .background(Color.paper)
         .navigationTitle(account.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showExport = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .foregroundStyle(Color.mint)
+                }
+                .accessibilityLabel("Export statement")
+            }
+        }
+        .sheet(isPresented: $showExport) {
+            StatementExportSheet(store: store, account: account)
+        }
+    }
+}
+
+struct StatementExportSheet: View {
+    @ObservedObject var store: BankStore
+    let account: BankAccount
+
+    @State private var month = Date()
+    @State private var fileURL: URL?
+    @State private var transactionCount = 0
+
+    private var isCurrentMonth: Bool {
+        Calendar.current.isDate(month, equalTo: Date(), toGranularity: .month)
+    }
+
+    private var monthTitle: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: month)
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Text("Export statement")
+                .font(.headline)
+                .foregroundStyle(Color.ink)
+
+            HStack {
+                Button {
+                    month = Calendar.current.date(byAdding: .month, value: -1, to: month) ?? month
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.ink)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(Color.white))
+                }
+                Spacer()
+                Text(monthTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                Spacer()
+                Button {
+                    month = Calendar.current.date(byAdding: .month, value: 1, to: month) ?? month
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color.ink)
+                        .frame(width: 40, height: 40)
+                        .background(Circle().fill(Color.white))
+                }
+                .disabled(isCurrentMonth)
+                .opacity(isCurrentMonth ? 0.3 : 1)
+            }
+
+            Text("\(transactionCount) transaction\(transactionCount == 1 ? "" : "s") in this month")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if let fileURL {
+                ShareLink(item: fileURL, preview: SharePreview("Statement — \(account.name), \(monthTitle)")) {
+                    Label("Export statement", systemImage: "square.and.arrow.up")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Color.mint))
+                }
+            } else {
+                Text("Could not prepare the statement.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .background(Color.paper)
+        .presentationDetents([.height(240)])
+        .onAppear { prepare() }
+        .onChange(of: month) { _ in prepare() }
+    }
+
+    private func prepare() {
+        fileURL = nil
+        let calendar = Calendar.current
+        let interval = calendar.dateInterval(of: .month, for: month) ?? DateInterval()
+        transactionCount = store.transactions(for: account.id).filter { interval.contains($0.date) }.count
+
+        let idFormatter = DateFormatter()
+        idFormatter.dateFormat = "yyyy-MM"
+        let safeName = account.name.replacingOccurrences(of: "/", with: "-")
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("Statement - \(safeName) - \(idFormatter.string(from: month)).csv")
+
+        let csv = store.statementCSV(for: account.id, month: month)
+        do {
+            try csv.data(using: .utf8)?.write(to: url)
+            fileURL = url
+        } catch {
+            fileURL = nil
+        }
     }
 }
 

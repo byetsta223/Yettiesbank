@@ -18,12 +18,18 @@ struct TransferFlowView: View {
     @Environment(\.dismiss) private var dismiss
 
     private enum Step { case amount, confirm, success }
+    private enum RecipientMode { case accounts, contacts, eTransfer }
+
     @State private var step: Step = .amount
     @State private var amountText = ""
-    @State private var useContacts = false
+    @State private var recipientMode: RecipientMode = .contacts
     @State private var fromID: UUID?
     @State private var toContactID: UUID?
     @State private var toAccountID: UUID?
+    @State private var newName = ""
+    @State private var newHandle = ""
+    @State private var question = ""
+    @State private var answer = ""
     @State private var note = ""
     @State private var showValidationError = false
     @State private var validationMessage = ""
@@ -36,8 +42,28 @@ struct TransferFlowView: View {
     private var toContact: Contact? { store.contacts.first { $0.id == toContactID } }
     private var toAccount: BankAccount? { store.accounts.first { $0.id == toAccountID } }
 
+    private var trimmedName: String { newName.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var trimmedHandle: String { newHandle.trimmingCharacters(in: .whitespacesAndNewlines) }
+
     private var recipientName: String {
-        useContacts ? (toContact?.name ?? "a contact") : (toAccount?.name ?? "an account")
+        switch recipientMode {
+        case .accounts: return toAccount?.name ?? "an account"
+        case .contacts: return toContact?.name ?? "a contact"
+        case .eTransfer: return trimmedName.isEmpty ? "a new recipient" : trimmedName
+        }
+    }
+
+    private var hasRecipient: Bool {
+        switch recipientMode {
+        case .accounts: return toAccountID != nil
+        case .contacts: return toContact != nil
+        case .eTransfer: return !trimmedName.isEmpty && !trimmedHandle.isEmpty
+        }
+    }
+
+    private var canProceed: Bool {
+        guard let from = fromAccount else { return false }
+        return amount > 0 && amount <= from.balance && hasRecipient
     }
 
     var body: some View {
@@ -50,7 +76,7 @@ struct TransferFlowView: View {
         }
         .background(Color.paper.ignoresSafeArea())
         .onAppear {
-            useContacts = (initialMode == .send)
+            recipientMode = (initialMode == .send) ? .contacts : .accounts
             if fromID == nil { fromID = store.accounts.first?.id }
         }
         .alert(validationMessage, isPresented: $showValidationError) {
@@ -92,28 +118,46 @@ struct TransferFlowView: View {
             }
             .padding(.vertical, 22)
 
-            Picker("Recipient", selection: $useContacts) {
-                Text("My accounts").tag(false)
-                Text("Contacts").tag(true)
+            Picker("Recipient", selection: $recipientMode) {
+                Text("My accounts").tag(RecipientMode.accounts)
+                Text("Contacts").tag(RecipientMode.contacts)
+                Text("E-transfer").tag(RecipientMode.eTransfer)
             }
             .pickerStyle(.segmented)
             .padding(.horizontal, 20)
             .tint(Color.mint)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    if useContacts {
-                        ForEach(store.contacts) { contact in
-                            personChip(contact)
-                        }
-                    } else {
-                        ForEach(store.accounts.filter { $0.id != fromID }) { account in
-                            accountChip(account)
-                        }
-                    }
+            if recipientMode == .eTransfer {
+                VStack(spacing: 10) {
+                    TextField("Recipient name", text: $newName)
+                        .padding(14)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+                    TextField("Email or mobile number", text: $newHandle)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .padding(14)
+                        .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
                 }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.ink)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 14)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        if recipientMode == .contacts {
+                            ForEach(store.contacts) { contact in
+                                personChip(contact)
+                            }
+                        } else {
+                            ForEach(store.accounts.filter { $0.id != fromID }) { account in
+                                accountChip(account)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 14)
+                }
             }
 
             Menu {
@@ -138,12 +182,20 @@ struct TransferFlowView: View {
             }
             .padding(.horizontal, 20)
 
-            TextField("Add a note (optional)", text: $note)
-                .font(.subheadline)
-                .padding(14)
-                .background(Color.white, in: RoundedRectangle(cornerRadius: 14))
+            if !hasRecipient {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.badge.exclamationmark")
+                    Text(recipientMode == .eTransfer ? "Enter a name and an email or mobile number"
+                                             : (recipientMode == .contacts ? "Select a contact to send to" : "Select an account to move money to"))
+                        .font(.footnote.weight(.medium))
+                }
+                .foregroundStyle(Color(hex: "8A6D1F"))
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(hex: "F6EFD9"), in: RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
+            }
 
             Spacer(minLength: 14)
 
@@ -158,7 +210,7 @@ struct TransferFlowView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.mint, in: RoundedRectangle(cornerRadius: 16))
+                    .background(canProceed ? Color.mint : Color.mint.opacity(0.35), in: RoundedRectangle(cornerRadius: 16))
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
@@ -227,12 +279,17 @@ struct TransferFlowView: View {
             .padding(.vertical, 16)
 
             VStack(spacing: 18) {
-                Image(systemName: "person.crop.circle.fill")
+                Image(systemName: recipientMode == .eTransfer ? "paperplane.circle.fill" : "person.crop.circle.fill")
                     .font(.system(size: 46))
                     .foregroundStyle(Color.mint)
                 Text(recipientName)
                     .font(.title3.bold())
                     .foregroundStyle(Color.ink)
+                if recipientMode == .eTransfer && !trimmedHandle.isEmpty {
+                    Text(trimmedHandle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
                 Text(Currency.string(amount))
                     .font(.system(size: 40, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ink)
@@ -241,9 +298,41 @@ struct TransferFlowView: View {
 
             VStack(spacing: 14) {
                 summaryRow(label: "From", value: fromAccount?.name ?? "—")
-                summaryRow(label: "To", value: recipientName)
-                if !note.isEmpty {
-                    summaryRow(label: "Note", value: note)
+                summaryRow(label: "To", value: recipientMode == .eTransfer ? trimmedHandle : recipientName)
+                HStack(alignment: .top, spacing: 12) {
+                    Text("Note")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    TextField("Optional", text: $note, axis: .vertical)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.ink)
+                        .multilineTextAlignment(.trailing)
+                        .frame(maxWidth: 180)
+                }
+                if recipientMode == .eTransfer {
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("Security question")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        TextField("e.g. Favourite city?", text: $question, axis: .vertical)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.ink)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 180)
+                    }
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("Answer")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        SecureField("Answer", text: $answer)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.ink)
+                            .multilineTextAlignment(.trailing)
+                            .frame(maxWidth: 180)
+                    }
                 }
                 summaryRow(label: "Fee", value: "No fee")
             }
@@ -255,15 +344,26 @@ struct TransferFlowView: View {
 
             Button {
                 if let from = fromAccount {
-                    store.performTransfer(from: from.id,
-                                          toContactID: useContacts ? toContactID : nil,
-                                          toAccountID: useContacts ? nil : toAccountID,
-                                          amount: amount,
-                                          note: note)
+                    if recipientMode == .eTransfer {
+                        store.sendETransfer(from: from.id,
+                                            recipientName: trimmedName,
+                                            handle: trimmedHandle,
+                                            amount: amount,
+                                            note: note,
+                                            question: question,
+                                            answer: answer)
+                    } else {
+                        store.performTransfer(from: from.id,
+                                              toContactID: recipientMode == .contacts ? toContactID : nil,
+                                              toAccountID: recipientMode == .accounts ? toAccountID : nil,
+                                              amount: amount,
+                                              note: note)
+                    }
                 }
                 withAnimation(.snappy) { step = .success }
             } label: {
-                Text(initialMode == .send ? "Confirm & send" : "Confirm & move")
+                Text(recipientMode == .eTransfer ? "Confirm & send e-transfer"
+                     : (initialMode == .send ? "Confirm & send" : "Confirm & move"))
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -295,7 +395,7 @@ struct TransferFlowView: View {
             Image(systemName: "checkmark.circle.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(Color.mint)
-            Text("Money sent")
+            Text(recipientMode == .eTransfer ? "E-transfer sent" : "Money sent")
                 .font(.title.bold())
                 .foregroundStyle(Color.ink)
             Text("\(Currency.string(amount)) to \(recipientName)")
@@ -323,6 +423,10 @@ struct TransferFlowView: View {
         note = ""
         toContactID = nil
         toAccountID = nil
+        newName = ""
+        newHandle = ""
+        question = ""
+        answer = ""
         if !embedded {
             dismiss()
         }
@@ -337,8 +441,18 @@ struct TransferFlowView: View {
                 message = "Enter an amount greater than $0."
             } else if amount > from.balance {
                 message = "Insufficient balance in \(from.name)."
-            } else if useContacts {
+            } else if recipientMode == .contacts {
                 if toContact == nil { message = "Choose a contact." }
+            } else if recipientMode == .eTransfer {
+                if trimmedName.isEmpty {
+                    message = "Enter the recipient's name."
+                } else if trimmedHandle.isEmpty {
+                    message = "Enter an email or mobile number."
+                } else if question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    message = "Set a security question."
+                } else if answer.isEmpty {
+                    message = "Set the answer to your security question."
+                }
             } else {
                 if toAccount == nil {
                     message = "Choose an account."

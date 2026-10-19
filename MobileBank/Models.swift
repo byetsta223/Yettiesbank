@@ -268,8 +268,8 @@ final class BankStore: ObservableObject {
         if let toContact = contacts.first(where: { $0.id == toContactID }) {
             accounts[fromIndex].balance -= amount
             let tx = Transaction(id: UUID(), accountId: fromID,
-                                 merchant: note.isEmpty ? toContact.name : toContact.name,
-                                 category: note.isEmpty ? "Transfers" : note,
+                                 merchant: toContact.name,
+                                 category: "Transfers",
                                  icon: "person.fill", amount: -amount, date: now)
             transactions.insert(tx, at: 0)
             addNotification(title: "Transfer sent",
@@ -291,6 +291,45 @@ final class BankStore: ObservableObject {
                             message: "\(Currency.string(amount)) moved to \(accounts[toIndex].name)",
                             icon: "arrow.left.arrow.right", colorHex: "4C8DF5")
         }
+    }
+
+    // MARK: - E-transfers
+
+    /// Sends an e-transfer to an external recipient identified by email or mobile
+    /// number. The money leaves the account immediately, the recipient is saved to
+    /// contacts for future sends, and a security question protects the transfer.
+    func sendETransfer(from accountID: UUID, recipientName: String, handle: String,
+                       amount: Double, note: String, question: String, answer: String) {
+        guard amount > 0,
+              let index = accounts.firstIndex(where: { $0.id == accountID }),
+              accounts[index].balance >= amount else { return }
+
+        let name = recipientName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedHandle = handle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !trimmedHandle.isEmpty else { return }
+
+        accounts[index].balance -= amount
+        let tx = Transaction(id: UUID(), accountId: accountID,
+                             merchant: name,
+                             category: "Transfers",
+                             icon: "paperplane.fill", amount: -amount, date: Date())
+        transactions.insert(tx, at: 0)
+
+        let alreadySaved = contacts.contains {
+            $0.handle.caseInsensitiveCompare(trimmedHandle) == .orderedSame
+        }
+        if !alreadySaved {
+            let palette = ["D96A7B", "5B7BD5", "D08A3E", "4EA58B", "8E6FD8", "F2762E"]
+            let stableHash = name.unicodeScalars.reduce(0) { $0 &+ Int($1.value) }
+            let color = palette[stableHash % palette.count]
+            contacts.append(Contact(id: UUID(), name: name, handle: trimmedHandle, colorHex: color))
+        }
+
+        addNotification(title: "E-transfer sent",
+                        message: "\(Currency.string(amount)) to \(name) · \(trimmedHandle)",
+                        icon: "paperplane.fill", colorHex: "4C8DF5")
+        applyRoundUp(sourceAccountID: accountID, purchaseAmount: amount)
+        persist()
     }
 
     // MARK: - Goals

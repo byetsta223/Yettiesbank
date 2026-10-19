@@ -114,6 +114,34 @@ struct AppNotification: Identifiable, Codable, Equatable {
     var isRead: Bool
 }
 
+struct VirtualCard: Identifiable, Codable, Equatable {
+    let id: UUID
+    var sourceAccountID: UUID
+    var cardNumber: String
+    var expiry: String
+    var cvc: String
+    var limit: Double
+    var spent: Double
+    var isFrozen: Bool
+    var createdAt: Date
+
+    var remaining: Double { max(limit - spent, 0) }
+    var isUsedUp: Bool { limit > 0 && remaining < 0.01 }
+    var last4: String { String(cardNumber.suffix(4)) }
+
+    var maskedCardNumber: String {
+        guard cardNumber.count >= 4 else { return "•••• 0000" }
+        return "•••• " + last4
+    }
+
+    var formattedCardNumber: String {
+        let digits = cardNumber.prefix(16)
+        return stride(from: 0, to: digits.count, by: 4)
+            .map { String(digits[digits.index(digits.startIndex, offsetBy: $0)..<digits.index(digits.startIndex, offsetBy: min($0 + 4, digits.count))]) }
+            .joined(separator: " ")
+    }
+}
+
 extension Date {
     private static let dueLabelFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -142,6 +170,7 @@ final class BankStore: ObservableObject {
     @Published var goals: [Goal] = []
     @Published var bills: [BillPayment] = []
     @Published var notifications: [AppNotification] = []
+    @Published var virtualCards: [VirtualCard] = []
     @Published var hideBalances = false {
         didSet { persist() }
     }
@@ -164,6 +193,7 @@ final class BankStore: ObservableObject {
             goals = state.goals ?? seedGoals()
             bills = state.bills ?? seedBills()
             notifications = state.notifications ?? seedNotifications()
+            virtualCards = state.virtualCards ?? []
             hideBalances = state.hideBalances
             roundUpEnabled = state.roundUpEnabled ?? false
             roundUpGoalID = state.roundUpGoalID
@@ -284,6 +314,64 @@ final class BankStore: ObservableObject {
         persist()
     }
 
+    // MARK: - Virtual cards
+
+    /// Issues a single-use virtual card against a card account.
+    @discardableResult
+    func addVirtualCard(sourceAccountID: UUID, limit: Double) -> VirtualCard {
+        let calendar = Calendar.current
+        let expiryDate = calendar.date(byAdding: .year, value: 3, to: Date()) ?? Date()
+        let month = calendar.component(.month, from: expiryDate)
+        let year = calendar.component(.year, from: expiryDate) % 100
+
+        var digits = "4"
+        for _ in 1..<16 { digits.append(String(Int.random(in: 0...9))) }
+
+        let card = VirtualCard(id: UUID(),
+                               sourceAccountID: sourceAccountID,
+                               cardNumber: digits,
+                               expiry: String(format: "%02d/%02d", month, year),
+                               cvc: String(format: "%03d", Int.random(in: 100...999)),
+                               limit: limit, spent: 0,
+                               isFrozen: false, createdAt: Date())
+        virtualCards.insert(card, at: 0)
+        persist()
+        return card
+    }
+
+    func toggleVirtualCardFreeze(_ id: UUID) {
+        guard let index = virtualCards.firstIndex(where: { $0.id == id }) else { return }
+        virtualCards[index].isFrozen.toggle()
+        addNotification(title: virtualCards[index].isFrozen ? "Virtual card frozen" : "Virtual card unfrozen",
+                        message: "•••• \(virtualCards[index].last4)",
+                        icon: "snowflake", colorHex: "4C8DF5")
+        persist()
+    }
+
+    /// Charges a virtual card: records the purchase on the source account
+    /// and declines anything that would push total spending past the limit.
+    @discardableResult
+    func spendOnVirtualCard(id: UUID, amount: Double) -> Bool {
+        guard amount > 0,
+              let index = virtualCards.firstIndex(where: { $0.id == id }),
+              let accountIndex = accounts.firstIndex(where: { $0.id == virtualCards[index].sourceAccountID }) else { return false }
+        guard !virtualCards[index].isFrozen else { return false }
+        guard virtualCards[index].remaining >= amount - 0.001 else { return false }
+
+        virtualCards[index].spent += amount
+        accounts[accountIndex].balance -= amount
+
+        let tx = Transaction(id: UUID(), accountId: accounts[accountIndex].id,
+                             merchant: "Online purchase", category: "Virtual card",
+                             icon: "sparkles", amount: -amount, date: Date())
+        transactions.insert(tx, at: 0)
+        addNotification(title: "Virtual card purchase",
+                        message: "\(Currency.string(amount)) · •••• \(virtualCards[index].last4)",
+                        icon: "sparkles", colorHex: "0E7C5A")
+        persist()
+        return true
+    }
+
     func resetDemoData() {
         if let domain = Bundle.main.bundleIdentifier {
             defaults.removePersistentDomain(forName: domain)
@@ -396,6 +484,7 @@ final class BankStore: ObservableObject {
         var goals: [Goal]?
         var bills: [BillPayment]?
         var notifications: [AppNotification]?
+        var virtualCards: [VirtualCard]?
         var hideBalances: Bool
         var roundUpEnabled: Bool?
         var roundUpGoalID: UUID?
@@ -404,7 +493,8 @@ final class BankStore: ObservableObject {
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
                                 contacts: contacts, goals: goals, bills: bills,
-                                notifications: notifications, hideBalances: hideBalances,
+                                notifications: notifications, virtualCards: virtualCards,
+                                hideBalances: hideBalances,
                                 roundUpEnabled: roundUpEnabled, roundUpGoalID: roundUpGoalID)
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: storageKey)
@@ -467,6 +557,7 @@ final class BankStore: ObservableObject {
         goals = seedGoals()
         bills = seedBills()
         notifications = seedNotifications()
+        virtualCards = []
         roundUpEnabled = false
         roundUpGoalID = nil
 

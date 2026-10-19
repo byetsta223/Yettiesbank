@@ -283,7 +283,7 @@ struct HomeView: View {
             }
             VStack(spacing: 12) {
                 ForEach(store.transactions(for: nil).prefix(5)) { tx in
-                    TransactionRow(tx: tx)
+                    EditableTransactionRow(store: store, tx: tx)
                 }
             }
             .padding(16)
@@ -316,7 +316,7 @@ struct AccountDetailView: View {
 
             Section("Activity") {
                 ForEach(store.transactions(for: account.id)) { tx in
-                    TransactionRow(tx: tx)
+                    EditableTransactionRow(store: store, tx: tx)
                 }
             }
             .listRowBackground(Color.white)
@@ -511,7 +511,7 @@ struct AllTransactionsView: View {
                     ForEach(grouped, id: \.day) { group in
                         Section(group.day) {
                             ForEach(group.items) { tx in
-                                TransactionRow(tx: tx)
+                                EditableTransactionRow(store: store, tx: tx)
                             }
                         }
                     }

@@ -57,6 +57,15 @@ struct Transaction: Identifiable, Codable, Equatable {
     var date: Date
 }
 
+enum TransactionCategories {
+    /// The app's fixed category list, offered in the transaction editor.
+    static let fixed = [
+        "Groceries", "Food & drink", "Transport", "Subscriptions",
+        "Electronics", "Travel", "Cash", "Bills", "Income",
+        "Refund", "Internal transfer"
+    ]
+}
+
 struct Contact: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
@@ -211,6 +220,30 @@ final class BankStore: ObservableObject {
         transactions
             .filter { accountID == nil || $0.accountId == accountID }
             .sorted { $0.date > $1.date }
+    }
+
+    // MARK: - Transaction editing
+
+    /// Categories already used by transactions that are not in the fixed list.
+    var extraCategoriesInUse: [String] {
+        Set(transactions.map(\.category))
+            .subtracting(TransactionCategories.fixed)
+            .sorted()
+    }
+
+    /// All categories available in the transaction editor: the fixed list plus any in use.
+    var editorCategories: [String] {
+        TransactionCategories.fixed + extraCategoriesInUse
+    }
+
+    /// Updates a transaction's merchant name and category. Editing never touches balances.
+    func updateTransaction(_ id: UUID, merchant: String, category: String) {
+        guard let index = transactions.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = merchant.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        transactions[index].merchant = trimmed
+        transactions[index].category = category
+        persist()
     }
 
     func update(account id: UUID, _ modify: (inout BankAccount) -> Void) {

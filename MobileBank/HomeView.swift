@@ -205,6 +205,34 @@ struct HomeView: View {
         .padding(16)
     }
 
+    private struct UpcomingItem: Identifiable {
+        let id: UUID
+        let title: String
+        let subtitle: String
+        let amount: Double
+        let icon: String
+        let isRecurringTransfer: Bool
+        let due: Date
+    }
+
+    private var upcomingItems: [UpcomingItem] {
+        var items: [UpcomingItem] = []
+        for bill in store.bills {
+            items.append(UpcomingItem(id: bill.id, title: bill.payee,
+                                      subtitle: "\(bill.frequency.rawValue) · due \(bill.nextDue.dueLabel())",
+                                      amount: bill.amount, icon: "receipt",
+                                      isRecurringTransfer: false, due: bill.nextDue))
+        }
+        for recurring in store.recurringTransfers {
+            items.append(UpcomingItem(id: recurring.id, title: recurring.title,
+                                      subtitle: "Repeats \(recurring.frequency.rawValue.lowercased()) · next \(recurring.nextDue.dueLabel())",
+                                      amount: recurring.amount,
+                                      icon: recurring.kind == .goal ? "target" : "arrow.left.arrow.right",
+                                      isRecurringTransfer: true, due: recurring.nextDue))
+        }
+        return items.sorted { $0.due < $1.due }
+    }
+
     private var upcomingSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
@@ -220,7 +248,7 @@ struct HomeView: View {
                         .foregroundStyle(Color.mint)
                 }
             }
-            if store.bills.isEmpty {
+            if upcomingItems.isEmpty {
                 HStack {
                     Spacer()
                     Text("No upcoming payments scheduled")
@@ -234,9 +262,9 @@ struct HomeView: View {
                 .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(Array(store.bills.sorted { $0.nextDue < $1.nextDue }.enumerated()), id: \.element.id) { index, bill in
-                        billRow(bill)
-                        if index < store.bills.count - 1 {
+                    ForEach(Array(upcomingItems.enumerated()), id: \.element.id) { index, item in
+                        upcomingRow(item)
+                        if index < upcomingItems.count - 1 {
                             Divider().padding(.leading, 66)
                         }
                     }
@@ -247,25 +275,36 @@ struct HomeView: View {
         }
     }
 
-    private func billRow(_ bill: BillPayment) -> some View {
+    private func upcomingRow(_ item: UpcomingItem) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: "receipt")
+            Image(systemName: item.icon)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color.mint)
                 .frame(width: 40, height: 40)
                 .background(Circle().fill(Color(hex: "E2F3EC")))
             VStack(alignment: .leading, spacing: 3) {
-                Text(bill.payee)
+                Text(item.title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(Color.ink)
-                Text("\(bill.frequency.rawValue) · due \(bill.nextDue.dueLabel())")
+                Text(item.subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(store.hideBalances ? "••••" : Currency.string(bill.amount))
+            Text(store.hideBalances ? "••••" : Currency.string(item.amount))
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(Color.ink)
+            if item.isRecurringTransfer {
+                Button {
+                    store.removeRecurringTransfer(item.id)
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Color.subtleText)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove recurring transfer")
+            }
         }
         .padding(16)
     }

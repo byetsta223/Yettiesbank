@@ -113,6 +113,26 @@ struct BillPayment: Identifiable, Codable, Equatable {
     var nextDue: Date
 }
 
+enum RecurringTransferKind: String, Codable {
+    case transfer
+    case goal
+}
+
+/// A transfer (or goal contribution) that repeats on a schedule and is
+/// recorded automatically when its due date arrives, like a bill payment.
+struct RecurringTransfer: Identifiable, Codable, Equatable {
+    let id: UUID
+    var kind: RecurringTransferKind
+    var title: String
+    var fromAccountID: UUID
+    var toContactID: UUID?
+    var toAccountID: UUID?
+    var goalID: UUID?
+    var amount: Double
+    var frequency: BillFrequency
+    var nextDue: Date
+}
+
 struct AppNotification: Identifiable, Codable, Equatable {
     let id: UUID
     var title: String
@@ -178,6 +198,7 @@ final class BankStore: ObservableObject {
     @Published var contacts: [Contact] = []
     @Published var goals: [Goal] = []
     @Published var bills: [BillPayment] = []
+    @Published var recurringTransfers: [RecurringTransfer] = []
     @Published var notifications: [AppNotification] = []
     @Published var virtualCards: [VirtualCard] = []
     @Published var hideBalances = false {
@@ -201,12 +222,14 @@ final class BankStore: ObservableObject {
             contacts = state.contacts
             goals = state.goals ?? seedGoals()
             bills = state.bills ?? seedBills()
+            recurringTransfers = state.recurringTransfers ?? []
             notifications = state.notifications ?? seedNotifications()
             virtualCards = state.virtualCards ?? []
             hideBalances = state.hideBalances
             roundUpEnabled = state.roundUpEnabled ?? false
             roundUpGoalID = state.roundUpGoalID
             processDueBills()
+            processDueRecurringTransfers()
         } else {
             seed()
         }
@@ -494,6 +517,66 @@ final class BankStore: ObservableObject {
         if changed { persist() }
     }
 
+    // MARK: - Recurring transfers
+
+    /// Schedules a repeating transfer or goal contribution. The first occurrence
+    /// is executed by the caller; this schedules the ones that follow, mirroring
+    /// how scheduled bill payments are stored.
+    func addRecurringTransfer(kind: RecurringTransferKind, title: String,
+                              fromAccountID: UUID, toContactID: UUID? = nil,
+                              toAccountID: UUID? = nil, goalID: UUID? = nil,
+                              amount: Double, frequency: BillFrequency) {
+        guard amount > 0, accounts.contains(where: { $0.id == fromAccountID }) else { return }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let recurring = RecurringTransfer(id: UUID(), kind: kind, title: trimmed,
+                                          fromAccountID: fromAccountID,
+                                          toContactID: toContactID,
+                                          toAccountID: toAccountID,
+                                          goalID: goalID, amount: amount,
+                                          frequency: frequency,
+                                          nextDue: frequency.date(after: Date()))
+        recurringTransfers.append(recurring)
+        persist()
+    }
+
+    func removeRecurringTransfer(_ id: UUID) {
+        recurringTransfers.removeAll { $0.id == id }
+        persist()
+    }
+
+    /// Records any scheduled transfers whose due date has arrived and rolls
+    /// them forward, the same way bill payments are processed while the app is used.
+    func processDueRecurringTransfers() {
+        let now = Date()
+        var changed = false
+
+        for index in recurringTransfers.indices {
+            let recurring = recurringTransfers[index]
+            var guardCounter = 0
+            while recurringTransfers[index].nextDue <= now, guardCounter < 60 {
+                let due = recurringTransfers[index].nextDue
+                switch recurring.kind {
+                case .transfer:
+                    performTransfer(from: recurring.fromAccountID,
+                                    toContactID: recurring.toContactID,
+                                    toAccountID: recurring.toAccountID,
+                                    amount: recurring.amount,
+                                    note: "Recurring \(recurring.frequency.rawValue.lowercased()) transfer")
+                case .goal:
+                    if let goalID = recurring.goalID {
+                        contribute(toGoal: goalID, fromAccount: recurring.fromAccountID,
+                                   amount: recurring.amount)
+                    }
+                }
+                recurringTransfers[index].nextDue = recurring.frequency.date(after: due)
+                guardCounter += 1
+                changed = true
+            }
+        }
+        if changed { persist() }
+    }
+
     // MARK: - Notifications
 
     var unreadNotificationCount: Int {
@@ -555,6 +638,7 @@ final class BankStore: ObservableObject {
         var contacts: [Contact]
         var goals: [Goal]?
         var bills: [BillPayment]?
+        var recurringTransfers: [RecurringTransfer]?
         var notifications: [AppNotification]?
         var virtualCards: [VirtualCard]?
         var hideBalances: Bool
@@ -565,6 +649,7 @@ final class BankStore: ObservableObject {
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
                                 contacts: contacts, goals: goals, bills: bills,
+                                recurringTransfers: recurringTransfers,
                                 notifications: notifications, virtualCards: virtualCards,
                                 hideBalances: hideBalances,
                                 roundUpEnabled: roundUpEnabled, roundUpGoalID: roundUpGoalID)

@@ -314,6 +314,7 @@ struct ContributeView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var accountID: UUID?
     @State private var amount: Double = 0
+    @State private var repeatFrequency: BillFrequency?
 
     private var account: BankAccount? {
         store.accounts.first { $0.id == accountID } ?? store.accounts.first
@@ -402,6 +403,20 @@ struct ContributeView: View {
                         Text("After this: \(Currency.string(afterSaving, cents: false)) of \(Currency.string(goal.target, cents: false)) saved.")
                     }
                 }
+
+                Section {
+                    Picker("Repeat", selection: $repeatFrequency) {
+                        Text("One time").tag(BillFrequency?.none)
+                        Text("Weekly").tag(BillFrequency?.some(.weekly))
+                        Text("Monthly").tag(BillFrequency?.some(.monthly))
+                    }
+                } header: {
+                    Text("Repeat")
+                } footer: {
+                    if let frequency = repeatFrequency {
+                        Text("Today's contribution goes through now; it repeats \(frequency.rawValue.lowercased()) after that. Remove it any time under Upcoming payments on Home.")
+                    }
+                }
             }
             .navigationTitle("Contribute")
             .navigationBarTitleDisplayMode(.inline)
@@ -413,6 +428,14 @@ struct ContributeView: View {
                     Button("Add to goal") {
                         if let acc = account {
                             store.contribute(toGoal: goal.id, fromAccount: acc.id, amount: amount)
+                            if let frequency = repeatFrequency {
+                                store.addRecurringTransfer(kind: .goal,
+                                                           title: "Saving for \(goal.name)",
+                                                           fromAccountID: acc.id,
+                                                           goalID: goal.id,
+                                                           amount: amount,
+                                                           frequency: frequency)
+                            }
                         }
                         dismiss()
                     }

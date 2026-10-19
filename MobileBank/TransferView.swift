@@ -31,6 +31,8 @@ struct TransferFlowView: View {
     @State private var question = ""
     @State private var answer = ""
     @State private var note = ""
+    @State private var repeatEnabled = false
+    @State private var repeatFrequency: BillFrequency = .monthly
     @State private var showValidationError = false
     @State private var validationMessage = ""
 
@@ -310,6 +312,28 @@ struct TransferFlowView: View {
                         .multilineTextAlignment(.trailing)
                         .frame(maxWidth: 180)
                 }
+                if recipientMode != .eTransfer {
+                    Toggle(isOn: $repeatEnabled) {
+                        Text("Repeat this transfer")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .tint(Color.mint)
+                    if repeatEnabled {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Frequency")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Picker("Frequency", selection: $repeatFrequency) {
+                                ForEach(BillFrequency.allCases) { frequency in
+                                    Text(frequency.rawValue).tag(frequency)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .tint(Color.mint)
+                        }
+                    }
+                }
                 if recipientMode == .eTransfer {
                     HStack(alignment: .top, spacing: 12) {
                         Text("Security question")
@@ -358,6 +382,17 @@ struct TransferFlowView: View {
                                               toAccountID: recipientMode == .accounts ? toAccountID : nil,
                                               amount: amount,
                                               note: note)
+                        if repeatEnabled {
+                            let title = recipientMode == .contacts
+                                ? (toContact?.name ?? "Contact")
+                                : "To \(toAccount?.name ?? "account")"
+                            store.addRecurringTransfer(kind: .transfer, title: title,
+                                                       fromAccountID: from.id,
+                                                       toContactID: recipientMode == .contacts ? toContactID : nil,
+                                                       toAccountID: recipientMode == .accounts ? toAccountID : nil,
+                                                       amount: amount,
+                                                       frequency: repeatFrequency)
+                        }
                     }
                 }
                 withAnimation(.snappy) { step = .success }
@@ -401,6 +436,11 @@ struct TransferFlowView: View {
             Text("\(Currency.string(amount)) to \(recipientName)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+            if repeatEnabled && recipientMode != .eTransfer {
+                Text("Repeats \(repeatFrequency.rawValue.lowercased()) from now on")
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(Color.mint)
+            }
             Spacer()
             Button {
                 done()
@@ -427,6 +467,8 @@ struct TransferFlowView: View {
         newHandle = ""
         question = ""
         answer = ""
+        repeatEnabled = false
+        repeatFrequency = .monthly
         if !embedded {
             dismiss()
         }

@@ -64,6 +64,14 @@ struct SignInGate: View {
     @AppStorage("signedInEmail") private var signedInEmail = ""
     @State private var showCreateAccount = false
     @State private var showEmailSignIn = false
+    @State private var appleError: String?
+
+    private var appleErrorBinding: Binding<Bool> {
+        Binding(
+            get: { appleError != nil },
+            set: { if !$0 { appleError = nil } }
+        )
+    }
 
     private var hasAccount: Bool { AccountStore.account != nil }
 
@@ -146,16 +154,39 @@ struct SignInGate: View {
         .sheet(isPresented: $showEmailSignIn) {
             EmailSignInView()
         }
+        .alert("Couldn't sign in with Apple", isPresented: appleErrorBinding) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(appleError ?? "")
+        }
     }
 
     private func handle(_ result: Result<ASAuthorization, Error>) {
-        if case .success(let auth) = result,
-           let credential = auth.credential as? ASAuthorizationAppleIDCredential {
+        switch result {
+        case .success(let auth):
+            guard let credential = auth.credential as? ASAuthorizationAppleIDCredential else {
+                appleError = "Apple didn't return a valid account. Please try again."
+                return
+            }
             let name = [credential.fullName?.givenName, credential.fullName?.familyName]
                 .compactMap { $0 }
                 .joined(separator: " ")
             signedInName = name.isEmpty ? "Friend" : name
             signedInEmail = credential.email ?? ""
+        case .failure(let error):
+            let code = (error as NSError).code
+            switch code {
+            case ASAuthorizationError.canceled.rawValue:
+                break // User closed the Apple sheet on purpose.
+            case ASAuthorizationError.unknown.rawValue:
+                appleError = "Sign in with Apple isn't available right now. Make sure you're signed into iCloud with your Apple ID in Settings, then try again."
+            case ASAuthorizationError.notInteractive.rawValue:
+                appleError = "Apple needs you to confirm the sign-in on screen. Please try again."
+            case ASAuthorizationError.failed.rawValue:
+                appleError = "The sign-in couldn't complete. Please check your connection and try again."
+            default:
+                appleError = "The sign-in couldn't complete. Please try again in a moment."
+            }
         }
     }
 }

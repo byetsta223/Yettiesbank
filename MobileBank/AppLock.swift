@@ -69,7 +69,7 @@ final class AppLock: ObservableObject {
             return
         }
 
-        context.evaluatePolicy(policy, localizedReason: "Unlock MobileBank to see your balances and payments.") { success, _ in
+        context.evaluatePolicy(policy, localizedReason: "Unlock Yetties Bank to see your balances and payments.") { success, _ in
             DispatchQueue.main.async {
                 self.pendingUnlock = false
                 if success {
@@ -106,7 +106,7 @@ struct LockScreenView: View {
             }
 
             VStack(spacing: 8) {
-                Text("MobileBank")
+                Text("Yetties Bank")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(Color.ink)
                 Text(signedInName.isEmpty ? "Your bank is locked" : "Welcome back, \(signedInName)")

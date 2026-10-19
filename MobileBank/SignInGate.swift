@@ -22,7 +22,7 @@ struct SignInGate: View {
                     .foregroundStyle(Color.mint)
             }
             VStack(spacing: 10) {
-                Text("MobileBank")
+                Text("Yetties Bank")
                     .font(.largeTitle.bold())
                     .foregroundStyle(Color.ink)
                 Text("Your money, beautifully organised.\nSign in to view balances, move money and track every payment.")

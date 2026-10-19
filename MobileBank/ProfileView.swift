@@ -63,6 +63,41 @@ struct ProfileView: View {
                     .listRowBackground(Color.white)
                 }
 
+                Section {
+                    Toggle(isOn: Binding(
+                        get: { store.roundUpEnabled },
+                        set: { newValue in
+                            store.roundUpEnabled = newValue
+                            if newValue && store.roundUpGoalID == nil {
+                                store.roundUpGoalID = store.goals.first?.id
+                            }
+                        }
+                    )) {
+                        Label("Round up purchases", systemImage: "arrow.up.circle")
+                            .foregroundStyle(Color.ink)
+                    }
+                    .tint(Color.mint)
+                    .listRowBackground(Color.white)
+
+                    if store.roundUpEnabled {
+                        Picker(selection: Binding(
+                            get: { store.roundUpGoalID ?? store.goals.first?.id },
+                            set: { store.roundUpGoalID = $0 }
+                        )) {
+                            ForEach(store.goals) { goal in
+                                Text("\(goal.emoji)  \(goal.name)").tag(goal.id as UUID?)
+                            }
+                        } label: {
+                            Text("Save to")
+                        }
+                        .listRowBackground(Color.white)
+                    }
+                } header: {
+                    Text("Round up savings")
+                } footer: {
+                    Text("Every card purchase is rounded up to the next whole dollar and the difference is saved into the chosen goal.")
+                }
+
                 Section("Data") {
                     Button {
                         showResetConfirm = true

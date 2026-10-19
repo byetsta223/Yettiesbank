@@ -145,6 +145,12 @@ final class BankStore: ObservableObject {
     @Published var hideBalances = false {
         didSet { persist() }
     }
+    @Published var roundUpEnabled = false {
+        didSet { persist() }
+    }
+    @Published var roundUpGoalID: UUID? {
+        didSet { persist() }
+    }
 
     private let defaults = UserDefaults.standard
     private let storageKey = "bank.state.v1"
@@ -159,6 +165,8 @@ final class BankStore: ObservableObject {
             bills = state.bills ?? seedBills()
             notifications = state.notifications ?? seedNotifications()
             hideBalances = state.hideBalances
+            roundUpEnabled = state.roundUpEnabled ?? false
+            roundUpGoalID = state.roundUpGoalID
             processDueBills()
         } else {
             seed()
@@ -204,6 +212,7 @@ final class BankStore: ObservableObject {
             addNotification(title: "Transfer sent",
                             message: "\(Currency.string(amount)) to \(toContact.name)",
                             icon: "arrow.up.right", colorHex: "4C8DF5")
+            applyRoundUp(sourceAccountID: fromID, purchaseAmount: amount, date: now)
         } else if let toID = toAccountID, let toIndex = accounts.firstIndex(where: { $0.id == toID }) {
             accounts[fromIndex].balance -= amount
             accounts[toIndex].balance += amount
@@ -250,6 +259,31 @@ final class BankStore: ObservableObject {
         persist()
     }
 
+    // MARK: - Round up savings
+
+    /// Rounds a card purchase up to the next whole dollar and moves the
+    /// difference into the chosen savings goal as a small internal transfer.
+    func applyRoundUp(sourceAccountID: UUID, purchaseAmount: Double, date: Date = Date()) {
+        guard roundUpEnabled, purchaseAmount > 0,
+              let goalID = roundUpGoalID,
+              let goalIndex = goals.firstIndex(where: { $0.id == goalID }),
+              let accountIndex = accounts.firstIndex(where: { $0.id == sourceAccountID }),
+              accounts[accountIndex].isCard else { return }
+
+        let difference = ceil(purchaseAmount) - purchaseAmount
+        guard difference >= 0.01 else { return }
+
+        accounts[accountIndex].balance -= difference
+        goals[goalIndex].saved += difference
+
+        let tx = Transaction(id: UUID(), accountId: sourceAccountID,
+                             merchant: "Round up — \(goals[goalIndex].name)",
+                             category: "Round up",
+                             icon: "arrow.up.circle.fill", amount: -difference, date: date)
+        transactions.insert(tx, at: 0)
+        persist()
+    }
+
     func resetDemoData() {
         if let domain = Bundle.main.bundleIdentifier {
             defaults.removePersistentDomain(forName: domain)
@@ -291,6 +325,7 @@ final class BankStore: ObservableObject {
                 addNotification(title: "Bill paid",
                                 message: "\(Currency.string(bill.amount)) to \(bill.payee)",
                                 icon: "receipt", colorHex: "4C8DF5")
+                applyRoundUp(sourceAccountID: bill.accountId, purchaseAmount: bill.amount, date: bill.nextDue)
                 bills[index].nextDue = bill.frequency.date(after: bill.nextDue)
                 guardCounter += 1
                 changed = true
@@ -362,12 +397,15 @@ final class BankStore: ObservableObject {
         var bills: [BillPayment]?
         var notifications: [AppNotification]?
         var hideBalances: Bool
+        var roundUpEnabled: Bool?
+        var roundUpGoalID: UUID?
     }
 
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
                                 contacts: contacts, goals: goals, bills: bills,
-                                notifications: notifications, hideBalances: hideBalances)
+                                notifications: notifications, hideBalances: hideBalances,
+                                roundUpEnabled: roundUpEnabled, roundUpGoalID: roundUpGoalID)
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: storageKey)
         }
@@ -429,6 +467,8 @@ final class BankStore: ObservableObject {
         goals = seedGoals()
         bills = seedBills()
         notifications = seedNotifications()
+        roundUpEnabled = false
+        roundUpGoalID = nil
 
         persist()
     }

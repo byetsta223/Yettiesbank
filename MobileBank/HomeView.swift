@@ -329,10 +329,27 @@ struct AccountDetailView: View {
 struct AllTransactionsView: View {
     @ObservedObject var store: BankStore
     @State private var filterID: UUID?
+    @State private var searchText = ""
+
+    private var matches: [Transaction] {
+        store.transactions(for: filterID).filter { searchMatches($0, query: searchText) }
+    }
+
+    private func searchMatches(_ tx: Transaction, query: String) -> Bool {
+        let query = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !query.isEmpty else { return true }
+        if tx.merchant.lowercased().contains(query) { return true }
+        if tx.category.lowercased().contains(query) { return true }
+        let plainAmount = String(format: "%.2f", abs(tx.amount))
+        if plainAmount.contains(query) { return true }
+        if plainAmount.replacingOccurrences(of: ".", with: "").contains(query.replacingOccurrences(of: ".", with: "")) { return true }
+        if Currency.string(abs(tx.amount)).lowercased().contains(query) { return true }
+        return false
+    }
 
     private var grouped: [(day: String, items: [Transaction])] {
         var result: [(String, [Transaction])] = []
-        for tx in store.transactions(for: filterID) {
+        for tx in matches {
             let label = tx.date.dayLabel()
             if result.last?.0 == label {
                 result[result.count - 1].1.append(tx)
@@ -357,21 +374,40 @@ struct AllTransactionsView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
             }
-            List {
-                ForEach(grouped, id: \.day) { group in
-                    Section(group.day) {
-                        ForEach(group.items) { tx in
-                            TransactionRow(tx: tx)
+            if !searchText.isEmpty && matches.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundStyle(Color.subtleText)
+                    Text("No results for \"\(searchText)\"")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text("Try a merchant, category or amount")
+                        .font(.caption)
+                        .foregroundStyle(Color.subtleText)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                List {
+                    ForEach(grouped, id: \.day) { group in
+                        Section(group.day) {
+                            ForEach(group.items) { tx in
+                                TransactionRow(tx: tx)
+                            }
                         }
                     }
                 }
+                .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
             }
-            .listStyle(.insetGrouped)
-            .scrollContentBackground(.hidden)
         }
         .background(Color.paper)
         .navigationTitle("All activity")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search transactions")
+        .onDisappear {
+            searchText = ""
+        }
     }
 
     private func chip(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {

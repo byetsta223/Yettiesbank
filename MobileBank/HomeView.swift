@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var showAll = false
     @State private var showGoals = false
     @State private var showScheduleBill = false
+    @State private var showNotifications = false
 
     private var firstName: String {
         userName.split(separator: " ").first.map(String.init) ?? "there"
@@ -32,13 +33,17 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 26) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(greeting)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text(firstName)
-                            .font(.title.bold())
-                            .foregroundStyle(Color.ink)
+                    HStack(alignment: .top) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(greeting)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(firstName)
+                                .font(.title.bold())
+                                .foregroundStyle(Color.ink)
+                        }
+                        Spacer()
+                        bellButton
                     }
                     balanceCard
                     quickActions
@@ -57,6 +62,9 @@ struct HomeView: View {
             .navigationDestination(isPresented: $showGoals) {
                 GoalsView(store: store)
             }
+            .navigationDestination(isPresented: $showNotifications) {
+                NotificationsView(store: store)
+            }
             .sheet(isPresented: $showTransfer) {
                 TransferFlowView(store: store, initialMode: transferMode)
             }
@@ -64,6 +72,31 @@ struct HomeView: View {
                 ScheduleBillView(store: store)
             }
         }
+    }
+
+    private var bellButton: some View {
+        Button {
+            showNotifications = true
+        } label: {
+            Image(systemName: "bell")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(Color.ink)
+                .frame(width: 42, height: 42)
+                .background(Circle().fill(Color.white))
+                .shadow(color: .black.opacity(0.06), radius: 6, y: 2)
+                .overlay(alignment: .topTrailing) {
+                    if store.unreadNotificationCount > 0 {
+                        Text(store.unreadNotificationCount > 9 ? "9+" : "\(store.unreadNotificationCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 4.5)
+                            .padding(.vertical, 2.5)
+                            .background(Capsule().fill(Color(hex: "E0524D")))
+                            .offset(x: 6, y: -5)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
     }
 
     private var balanceCard: some View {

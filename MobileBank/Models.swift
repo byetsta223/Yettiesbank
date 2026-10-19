@@ -104,6 +104,16 @@ struct BillPayment: Identifiable, Codable, Equatable {
     var nextDue: Date
 }
 
+struct AppNotification: Identifiable, Codable, Equatable {
+    let id: UUID
+    var title: String
+    var message: String
+    var icon: String
+    var colorHex: String
+    var date: Date
+    var isRead: Bool
+}
+
 extension Date {
     private static let dueLabelFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -113,6 +123,13 @@ extension Date {
 
     func dueLabel() -> String {
         Self.dueLabelFormatter.string(from: self)
+    }
+
+    func relativeLabel() -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        formatter.dateTimeStyle = .numeric
+        return formatter.localizedString(for: self, relativeTo: Date())
     }
 }
 
@@ -124,6 +141,7 @@ final class BankStore: ObservableObject {
     @Published var contacts: [Contact] = []
     @Published var goals: [Goal] = []
     @Published var bills: [BillPayment] = []
+    @Published var notifications: [AppNotification] = []
     @Published var hideBalances = false {
         didSet { persist() }
     }
@@ -139,6 +157,7 @@ final class BankStore: ObservableObject {
             contacts = state.contacts
             goals = state.goals ?? seedGoals()
             bills = state.bills ?? seedBills()
+            notifications = state.notifications ?? seedNotifications()
             hideBalances = state.hideBalances
             processDueBills()
         } else {
@@ -163,7 +182,11 @@ final class BankStore: ObservableObject {
     }
 
     func toggleFreeze(_ id: UUID) {
+        guard let account = accounts.first(where: { $0.id == id }) else { return }
         update(account: id) { $0.isFrozen.toggle() }
+        addNotification(title: account.isFrozen ? "Card unfrozen" : "Card frozen",
+                        message: "\(account.name) · \(account.maskedCardNumber)",
+                        icon: "snowflake", colorHex: "4C8DF5")
     }
 
     func performTransfer(from fromID: UUID, toContactID: UUID?, toAccountID: UUID?, amount: Double, note: String) {
@@ -178,6 +201,9 @@ final class BankStore: ObservableObject {
                                  category: note.isEmpty ? "Transfers" : note,
                                  icon: "person.fill", amount: -amount, date: now)
             transactions.insert(tx, at: 0)
+            addNotification(title: "Transfer sent",
+                            message: "\(Currency.string(amount)) to \(toContact.name)",
+                            icon: "arrow.up.right", colorHex: "4C8DF5")
         } else if let toID = toAccountID, let toIndex = accounts.firstIndex(where: { $0.id == toID }) {
             accounts[fromIndex].balance -= amount
             accounts[toIndex].balance += amount
@@ -189,6 +215,9 @@ final class BankStore: ObservableObject {
                                             merchant: "From \(accounts[fromIndex].name)",
                                             category: "Internal transfer",
                                             icon: "arrow.left.arrow.right", amount: amount, date: now), at: 0)
+            addNotification(title: "Transfer completed",
+                            message: "\(Currency.string(amount)) moved to \(accounts[toIndex].name)",
+                            icon: "arrow.left.arrow.right", colorHex: "4C8DF5")
         }
     }
 
@@ -215,6 +244,9 @@ final class BankStore: ObservableObject {
                              category: "Internal transfer",
                              icon: "target", amount: -amount, date: Date())
         transactions.insert(tx, at: 0)
+        addNotification(title: "Goal contribution",
+                        message: "\(Currency.string(amount)) added to \(goals[goalIndex].name)",
+                        icon: "target", colorHex: goals[goalIndex].colorHex)
         persist()
     }
 
@@ -256,12 +288,68 @@ final class BankStore: ObservableObject {
                                      merchant: bill.payee, category: "Bills",
                                      icon: "receipt", amount: -bill.amount, date: bill.nextDue)
                 transactions.insert(tx, at: 0)
+                addNotification(title: "Bill paid",
+                                message: "\(Currency.string(bill.amount)) to \(bill.payee)",
+                                icon: "receipt", colorHex: "4C8DF5")
                 bills[index].nextDue = bill.frequency.date(after: bill.nextDue)
                 guardCounter += 1
                 changed = true
             }
         }
         if changed { persist() }
+    }
+
+    // MARK: - Notifications
+
+    var unreadNotificationCount: Int {
+        notifications.filter { !$0.isRead }.count
+    }
+
+    func markNotificationRead(_ id: UUID) {
+        if let index = notifications.firstIndex(where: { $0.id == id }) {
+            notifications[index].isRead = true
+            persist()
+        }
+    }
+
+    func markAllNotificationsRead() {
+        for index in notifications.indices {
+            notifications[index].isRead = true
+        }
+        persist()
+    }
+
+    private func addNotification(title: String, message: String, icon: String, colorHex: String = "1C2540") {
+        let notification = AppNotification(id: UUID(), title: title, message: message,
+                                           icon: icon, colorHex: colorHex, date: Date(), isRead: false)
+        notifications.insert(notification, at: 0)
+        if notifications.count > 60 {
+            notifications.removeLast(notifications.count - 60)
+        }
+        persist()
+    }
+
+    private func seedNotifications() -> [AppNotification] {
+        let cal = Calendar.current
+        func hoursAgo(_ h: Int) -> Date { cal.date(byAdding: .hour, value: -h, to: Date())! }
+        return [
+            AppNotification(id: UUID(), title: "Salary deposited",
+                            message: "+ $3,450.00 from Meridian Labs",
+                            icon: "banknote.fill", colorHex: "0E7C5A",
+                            date: hoursAgo(20), isRead: false),
+            AppNotification(id: UUID(), title: "Transfer completed",
+                            message: "$30.00 moved to Travel",
+                            icon: "arrow.left.arrow.right", colorHex: "4C8DF5",
+                            date: hoursAgo(52), isRead: true),
+            AppNotification(id: UUID(), title: "Refund received",
+                            message: "$45.00 from Booking.com",
+                            icon: "arrow.uturn.left", colorHex: "0E7C5A",
+                            date: hoursAgo(70), isRead: true),
+            AppNotification(id: UUID(), title: "Card frozen",
+                            message: "Everyday · •••• 4821",
+                            icon: "snowflake", colorHex: "4C8DF5",
+                            date: hoursAgo(96), isRead: true)
+        ]
     }
 
     // MARK: - Persistence
@@ -272,12 +360,14 @@ final class BankStore: ObservableObject {
         var contacts: [Contact]
         var goals: [Goal]?
         var bills: [BillPayment]?
+        var notifications: [AppNotification]?
         var hideBalances: Bool
     }
 
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
-                                contacts: contacts, goals: goals, bills: bills, hideBalances: hideBalances)
+                                contacts: contacts, goals: goals, bills: bills,
+                                notifications: notifications, hideBalances: hideBalances)
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: storageKey)
         }
@@ -338,6 +428,7 @@ final class BankStore: ObservableObject {
 
         goals = seedGoals()
         bills = seedBills()
+        notifications = seedNotifications()
 
         persist()
     }

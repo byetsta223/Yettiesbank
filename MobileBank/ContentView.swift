@@ -8,18 +8,26 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var store = BankStore.shared
+    @AppStorage("signedInName") private var signedInName = ""
+
     var body: some View {
-        VStack {
-            Image(systemName: "checkmark.seal.fill")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-                .font(.title)
-                .padding()
-            Text("MobileBank running.")
-                .font(.title)
-                .padding()
+        if signedInName.isEmpty {
+            SignInGate()
+        } else {
+            TabView {
+                HomeView(store: store)
+                    .tabItem { Label("Home", systemImage: "house.fill") }
+                CardsView(store: store)
+                    .tabItem { Label("Cards", systemImage: "creditcard.fill") }
+                TransferTabView(store: store)
+                    .tabItem { Label("Transfer", systemImage: "arrow.left.arrow.right") }
+                ProfileView(store: store)
+                    .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
+            }
+            .tint(Color.mint)
+            .preferredColorScheme(.light)
         }
-        .padding()
     }
 }
 

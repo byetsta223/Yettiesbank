@@ -27,10 +27,11 @@
 		184F590C2E6ACF1E00FBE038 /* MobileBank.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MobileBank.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		184F59192E6ACF2000FBE038 /* MobileBankTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MobileBankTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		184F59232E6ACF2000FBE038 /* MobileBankUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MobileBankUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EF1228EB10E9BD2C838A954 /* MobileBank.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = MobileBank.entitlements; path = MobileBank/MobileBank.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		187AF0F92E828D1000505E98 /* Exceptions for "MobileBank" folder in "MobileBank" target */ = {
+		187AF0F92E828D1000505E98 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -43,7 +44,7 @@
 		184F590E2E6ACF1E00FBE038 /* MobileBank */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				187AF0F92E828D1000505E98 /* Exceptions for "MobileBank" folder in "MobileBank" target */,
+				187AF0F92E828D1000505E98 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
 			);
 			path = MobileBank;
 			sourceTree = "<group>";
@@ -92,6 +93,7 @@
 				184F591C2E6ACF2000FBE038 /* MobileBankTests */,
 				184F59262E6ACF2000FBE038 /* MobileBankUITests */,
 				184F590D2E6ACF1E00FBE038 /* Products */,
+				8EF1228EB10E9BD2C838A954 /* MobileBank.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -408,6 +410,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MobileBank/MobileBank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -442,6 +445,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = MobileBank/MobileBank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";

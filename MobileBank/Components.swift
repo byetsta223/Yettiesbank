@@ -105,6 +105,10 @@ struct CardVisual: View {
                     Text(account.expiry)
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.8))
+                    if account.cardNumber.hasPrefix("5") {
+                        mastercardMark
+                            .padding(.leading, 8)
+                    }
                 }
             }
             .padding(22)
@@ -124,5 +128,22 @@ struct CardVisual: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 24))
         .shadow(color: Color(hex: account.colorHex).opacity(0.35), radius: 14, y: 8)
+    }
+
+    /// The Mastercard twin-circle mark, drawn for cards whose number starts with 5.
+    private var mastercardMark: some View {
+        ZStack {
+            Circle()
+                .fill(Color(hex: "EB001B"))
+                .frame(width: 24, height: 24)
+            Circle()
+                .fill(Color(hex: "F79E1B"))
+                .frame(width: 24, height: 24)
+                .offset(x: 12, y: 0)
+            Circle()
+                .fill(Color(hex: "FF5F00"))
+                .frame(width: 18, height: 24)
+                .offset(x: 9, y: 0)
+        }
     }
 }

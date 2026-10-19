@@ -287,6 +287,7 @@ final class BankStore: ObservableObject {
         let checkingID = UUID()
         let savingsID = UUID()
         let travelID = UUID()
+        let creditID = UUID()
 
         accounts = [
             BankAccount(id: checkingID, name: "Everyday", kind: "Checking",
@@ -300,6 +301,10 @@ final class BankStore: ObservableObject {
             BankAccount(id: travelID, name: "Travel", kind: "Prepaid card",
                         number: "•• 7712", balance: 340.20, colorHex: "35507B",
                         isCard: true, cardNumber: "5412751234567712", expiry: "09/28",
+                        isFrozen: false, contactless: true, onlinePayments: true, atmWithdrawals: true),
+            BankAccount(id: creditID, name: "Mastercard Credit", kind: "Credit card",
+                        number: "•• 2841", balance: 1250.00, colorHex: "802536",
+                        isCard: true, cardNumber: "5191286745092841", expiry: "07/29",
                         isFrozen: false, contactless: true, onlinePayments: true, atmWithdrawals: true)
         ]
 

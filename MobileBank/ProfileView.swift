@@ -7,6 +7,7 @@ import SwiftUI
 
 struct ProfileView: View {
     @ObservedObject var store: BankStore
+    @ObservedObject private var lock = AppLock.shared
     @AppStorage("signedInName") private var signedInName = ""
     @AppStorage("signedInEmail") private var signedInEmail = ""
     @State private var showResetConfirm = false
@@ -40,6 +41,22 @@ struct ProfileView: View {
                 Section("Preferences") {
                     Toggle(isOn: $store.hideBalances) {
                         Label("Hide balances", systemImage: "eye.slash")
+                            .foregroundStyle(Color.ink)
+                    }
+                    .tint(Color.mint)
+                    .listRowBackground(Color.white)
+
+                    Toggle(isOn: Binding(
+                        get: { lock.isEnabled },
+                        set: { newValue in
+                            if newValue {
+                                lock.authenticateForToggle()
+                            } else {
+                                lock.isEnabled = false
+                            }
+                        }
+                    )) {
+                        Label("App lock", systemImage: "faceid")
                             .foregroundStyle(Color.ink)
                     }
                     .tint(Color.mint)

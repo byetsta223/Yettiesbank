@@ -9,10 +9,15 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var store = BankStore.shared
+    @StateObject private var lock = AppLock.shared
     @AppStorage("signedInName") private var signedInName = ""
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var checkedLaunchLock = false
 
     var body: some View {
-        if signedInName.isEmpty {
+        if lock.isLocked {
+            LockScreenView()
+        } else if signedInName.isEmpty {
             SignInGate()
         } else {
             TabView {
@@ -27,10 +32,22 @@ struct ContentView: View {
             }
             .tint(Color.mint)
             .preferredColorScheme(.light)
+            .onChange(of: scenePhase) { phase in
+                switch phase {
+                case .background:
+                    lock.appDidEnterBackground()
+                case .active:
+                    lock.appWillEnterForeground()
+                default:
+                    break
+                }
+            }
+            .onAppear {
+                if !checkedLaunchLock {
+                    checkedLaunchLock = true
+                    lock.lockAtLaunchIfNeeded()
+                }
+            }
         }
     }
-}
-
-#Preview {
-    ContentView()
 }

@@ -27,6 +27,8 @@ struct ContentView: View {
                     .tabItem { Label("Cards", systemImage: "creditcard.fill") }
                 TransferTabView(store: store)
                     .tabItem { Label("Transfer", systemImage: "arrow.left.arrow.right") }
+                InsightsView(store: store)
+                    .tabItem { Label("Insights", systemImage: "chart.bar.fill") }
                 ProfileView(store: store)
                     .tabItem { Label("Profile", systemImage: "person.crop.circle.fill") }
             }

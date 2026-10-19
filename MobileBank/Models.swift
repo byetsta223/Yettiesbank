@@ -6,10 +6,11 @@
 import Foundation
 
 enum Currency {
-    static func string(_ value: Double, showSign: Bool = false) -> String {
+    static func string(_ value: Double, showSign: Bool = false, cents: Bool = true) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = cents ? 2 : 0
         let base = formatter.string(from: NSNumber(value: abs(value))) ?? "$0.00"
         if showSign {
             return value < 0 ? "-\(base)" : "+\(base)"

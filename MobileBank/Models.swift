@@ -80,6 +80,42 @@ struct Goal: Identifiable, Codable, Equatable {
     }
 }
 
+enum BillFrequency: String, Codable, CaseIterable, Identifiable {
+    case weekly = "Weekly"
+    case monthly = "Monthly"
+
+    var id: String { rawValue }
+
+    func date(after date: Date) -> Date {
+        let calendar = Calendar.current
+        switch self {
+        case .weekly: return calendar.date(byAdding: .day, value: 7, to: date) ?? date
+        case .monthly: return calendar.date(byAdding: .month, value: 1, to: date) ?? date
+        }
+    }
+}
+
+struct BillPayment: Identifiable, Codable, Equatable {
+    let id: UUID
+    var payee: String
+    var amount: Double
+    var accountId: UUID
+    var frequency: BillFrequency
+    var nextDue: Date
+}
+
+extension Date {
+    private static let dueLabelFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter
+    }()
+
+    func dueLabel() -> String {
+        Self.dueLabelFormatter.string(from: self)
+    }
+}
+
 final class BankStore: ObservableObject {
     static let shared = BankStore()
 
@@ -87,6 +123,7 @@ final class BankStore: ObservableObject {
     @Published var transactions: [Transaction] = []
     @Published var contacts: [Contact] = []
     @Published var goals: [Goal] = []
+    @Published var bills: [BillPayment] = []
     @Published var hideBalances = false {
         didSet { persist() }
     }
@@ -101,7 +138,9 @@ final class BankStore: ObservableObject {
             transactions = state.transactions
             contacts = state.contacts
             goals = state.goals ?? seedGoals()
+            bills = state.bills ?? seedBills()
             hideBalances = state.hideBalances
+            processDueBills()
         } else {
             seed()
         }
@@ -186,6 +225,45 @@ final class BankStore: ObservableObject {
         seed()
     }
 
+    // MARK: - Bill payments
+
+    func addBill(payee: String, amount: Double, accountID: UUID, frequency: BillFrequency, firstDue: Date) {
+        let bill = BillPayment(id: UUID(), payee: payee, amount: amount,
+                               accountId: accountID, frequency: frequency, nextDue: firstDue)
+        bills.append(bill)
+        persist()
+        processDueBills()
+    }
+
+    func removeBill(_ id: UUID) {
+        bills.removeAll { $0.id == id }
+        persist()
+    }
+
+    /// Records any payments whose due date has arrived and rolls them forward,
+    /// so bills stay up to date whenever the app is used.
+    func processDueBills() {
+        let now = Date()
+        var changed = false
+
+        for index in bills.indices {
+            guard let accountIndex = accounts.firstIndex(where: { $0.id == bills[index].accountId }) else { continue }
+            var guardCounter = 0
+            while bills[index].nextDue <= now, guardCounter < 60 {
+                let bill = bills[index]
+                accounts[accountIndex].balance -= bill.amount
+                let tx = Transaction(id: UUID(), accountId: bill.accountId,
+                                     merchant: bill.payee, category: "Bills",
+                                     icon: "receipt", amount: -bill.amount, date: bill.nextDue)
+                transactions.insert(tx, at: 0)
+                bills[index].nextDue = bill.frequency.date(after: bill.nextDue)
+                guardCounter += 1
+                changed = true
+            }
+        }
+        if changed { persist() }
+    }
+
     // MARK: - Persistence
 
     private struct StoredState: Codable {
@@ -193,12 +271,13 @@ final class BankStore: ObservableObject {
         var transactions: [Transaction]
         var contacts: [Contact]
         var goals: [Goal]?
+        var bills: [BillPayment]?
         var hideBalances: Bool
     }
 
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
-                                contacts: contacts, goals: goals, hideBalances: hideBalances)
+                                contacts: contacts, goals: goals, bills: bills, hideBalances: hideBalances)
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: storageKey)
         }
@@ -253,6 +332,7 @@ final class BankStore: ObservableObject {
         ]
 
         goals = seedGoals()
+        bills = seedBills()
 
         persist()
     }
@@ -264,6 +344,22 @@ final class BankStore: ObservableObject {
             Goal(id: UUID(), name: "Emergency fund", emoji: "🚨", colorHex: "4C8DF5", target: 2000, saved: 500),
             Goal(id: UUID(), name: "Home deposit", emoji: "🏠", colorHex: "8E6FD8", target: 2500, saved: 2000),
             Goal(id: UUID(), name: "New phone", emoji: "📱", colorHex: "1FA97C", target: 700, saved: 700)
+        ]
+    }
+
+    private func seedBills() -> [BillPayment] {
+        let checkingID = accounts[0].id
+        let cal = Calendar.current
+        return [
+            BillPayment(id: UUID(), payee: "Riverside Apartments", amount: 1650.00,
+                        accountId: checkingID, frequency: .monthly,
+                        nextDue: cal.date(byAdding: .day, value: 2, to: Date())!),
+            BillPayment(id: UUID(), payee: "Spotify Premium", amount: 10.99,
+                        accountId: checkingID, frequency: .monthly,
+                        nextDue: cal.date(byAdding: .day, value: 5, to: Date())!),
+            BillPayment(id: UUID(), payee: "City Gym", amount: 12.50,
+                        accountId: checkingID, frequency: .weekly,
+                        nextDue: cal.date(byAdding: .day, value: 3, to: Date())!)
         ]
     }
 }

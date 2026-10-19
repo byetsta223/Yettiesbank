@@ -13,6 +13,7 @@ struct HomeView: View {
     @State private var transferMode: TransferMode = .send
     @State private var showAll = false
     @State private var showGoals = false
+    @State private var showScheduleBill = false
 
     private var firstName: String {
         userName.split(separator: " ").first.map(String.init) ?? "there"
@@ -42,6 +43,7 @@ struct HomeView: View {
                     balanceCard
                     quickActions
                     accountsSection
+                    upcomingSection
                     recentSection
                 }
                 .padding(.horizontal, 20)
@@ -57,6 +59,9 @@ struct HomeView: View {
             }
             .sheet(isPresented: $showTransfer) {
                 TransferFlowView(store: store, initialMode: transferMode)
+            }
+            .sheet(isPresented: $showScheduleBill) {
+                ScheduleBillView(store: store)
             }
         }
     }
@@ -163,6 +168,71 @@ struct HomeView: View {
             Image(systemName: "chevron.right")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.subtleText)
+        }
+        .padding(16)
+    }
+
+    private var upcomingSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Upcoming payments")
+                    .font(.headline)
+                    .foregroundStyle(Color.ink)
+                Spacer()
+                Button {
+                    showScheduleBill = true
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.mint)
+                }
+            }
+            if store.bills.isEmpty {
+                HStack {
+                    Spacer()
+                    Text("No upcoming payments scheduled")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 22))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(Array(store.bills.sorted { $0.nextDue < $1.nextDue }.enumerated()), id: \.element.id) { index, bill in
+                        billRow(bill)
+                        if index < store.bills.count - 1 {
+                            Divider().padding(.leading, 66)
+                        }
+                    }
+                }
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 22))
+                .shadow(color: .black.opacity(0.05), radius: 8, y: 2)
+            }
+        }
+    }
+
+    private func billRow(_ bill: BillPayment) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: "receipt")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(Color.mint)
+                .frame(width: 40, height: 40)
+                .background(Circle().fill(Color(hex: "E2F3EC")))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(bill.payee)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.ink)
+                Text("\(bill.frequency.rawValue) · due \(bill.nextDue.dueLabel())")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(store.hideBalances ? "••••" : Currency.string(bill.amount))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(Color.ink)
         }
         .padding(16)
     }

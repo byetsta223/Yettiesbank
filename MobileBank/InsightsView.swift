@@ -102,6 +102,7 @@ struct InsightsView: View {
         case "Electronics": return ("desktopcomputer", "6B7280", "EDEFF2")
         case "Travel": return ("airplane", "4EA58B", "E2F3EC")
         case "Cash": return ("banknote.fill", "D08A3E", "FBEFDF")
+        case "Bills": return ("receipt", "4C8DF5", "E1E8FA")
         case "Income": return ("banknote.fill", "0E7C5A", "E2F3EC")
         default: return ("creditcard.fill", "6B7280", "EDEFF2")
         }

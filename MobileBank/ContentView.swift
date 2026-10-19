@@ -39,6 +39,7 @@ struct ContentView: View {
                 case .background:
                     lock.appDidEnterBackground()
                 case .active:
+                    store.processDueBills()
                     lock.appWillEnterForeground()
                 default:
                     break

@@ -64,12 +64,29 @@ struct Contact: Identifiable, Codable, Equatable {
     var colorHex: String
 }
 
+struct Goal: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var emoji: String
+    var colorHex: String
+    var target: Double
+    var saved: Double
+
+    var fraction: Double {
+        target > 0 ? min(saved / target, 1) : 0
+    }
+    var isReached: Bool {
+        saved >= target
+    }
+}
+
 final class BankStore: ObservableObject {
     static let shared = BankStore()
 
     @Published var accounts: [BankAccount] = []
     @Published var transactions: [Transaction] = []
     @Published var contacts: [Contact] = []
+    @Published var goals: [Goal] = []
     @Published var hideBalances = false {
         didSet { persist() }
     }
@@ -83,6 +100,7 @@ final class BankStore: ObservableObject {
             accounts = state.accounts
             transactions = state.transactions
             contacts = state.contacts
+            goals = state.goals ?? seedGoals()
             hideBalances = state.hideBalances
         } else {
             seed()
@@ -135,6 +153,32 @@ final class BankStore: ObservableObject {
         }
     }
 
+    // MARK: - Goals
+
+    func addGoal(name: String, emoji: String, colorHex: String, target: Double) {
+        let goal = Goal(id: UUID(), name: name, emoji: emoji,
+                        colorHex: colorHex, target: target, saved: 0)
+        goals.append(goal)
+        persist()
+    }
+
+    func contribute(toGoal goalID: UUID, fromAccount accountID: UUID, amount: Double) {
+        guard amount > 0,
+              let goalIndex = goals.firstIndex(where: { $0.id == goalID }),
+              let accountIndex = accounts.firstIndex(where: { $0.id == accountID }),
+              accounts[accountIndex].balance >= amount else { return }
+
+        accounts[accountIndex].balance -= amount
+        goals[goalIndex].saved += amount
+
+        let tx = Transaction(id: UUID(), accountId: accountID,
+                             merchant: "Saving for \(goals[goalIndex].name)",
+                             category: "Internal transfer",
+                             icon: "target", amount: -amount, date: Date())
+        transactions.insert(tx, at: 0)
+        persist()
+    }
+
     func resetDemoData() {
         if let domain = Bundle.main.bundleIdentifier {
             defaults.removePersistentDomain(forName: domain)
@@ -148,12 +192,13 @@ final class BankStore: ObservableObject {
         var accounts: [BankAccount]
         var transactions: [Transaction]
         var contacts: [Contact]
+        var goals: [Goal]?
         var hideBalances: Bool
     }
 
     private func persist() {
         let state = StoredState(accounts: accounts, transactions: transactions,
-                                contacts: contacts, hideBalances: hideBalances)
+                                contacts: contacts, goals: goals, hideBalances: hideBalances)
         if let data = try? JSONEncoder().encode(state) {
             defaults.set(data, forKey: storageKey)
         }
@@ -207,6 +252,18 @@ final class BankStore: ObservableObject {
             Transaction(id: UUID(), accountId: savingsID, merchant: "Interest", category: "Income", icon: "percent", amount: 21.40, date: days(8, 1))
         ]
 
+        goals = seedGoals()
+
         persist()
+    }
+
+    private func seedGoals() -> [Goal] {
+        [
+            Goal(id: UUID(), name: "Japan trip", emoji: "✈️", colorHex: "3BB273", target: 5000, saved: 2150),
+            Goal(id: UUID(), name: "New laptop", emoji: "💻", colorHex: "F2762E", target: 1500, saved: 1000),
+            Goal(id: UUID(), name: "Emergency fund", emoji: "🚨", colorHex: "4C8DF5", target: 2000, saved: 500),
+            Goal(id: UUID(), name: "Home deposit", emoji: "🏠", colorHex: "8E6FD8", target: 2500, saved: 2000),
+            Goal(id: UUID(), name: "New phone", emoji: "📱", colorHex: "1FA97C", target: 700, saved: 700)
+        ]
     }
 }

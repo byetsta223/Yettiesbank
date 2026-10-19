@@ -12,6 +12,7 @@ struct HomeView: View {
     @State private var showTransfer = false
     @State private var transferMode: TransferMode = .send
     @State private var showAll = false
+    @State private var showGoals = false
 
     private var firstName: String {
         userName.split(separator: " ").first.map(String.init) ?? "there"
@@ -50,6 +51,9 @@ struct HomeView: View {
             .background(Color.paper.ignoresSafeArea())
             .navigationDestination(isPresented: $showAll) {
                 AllTransactionsView(store: store)
+            }
+            .navigationDestination(isPresented: $showGoals) {
+                GoalsView(store: store)
             }
             .sheet(isPresented: $showTransfer) {
                 TransferFlowView(store: store, initialMode: transferMode)
@@ -96,7 +100,7 @@ struct HomeView: View {
     }
 
     private var quickActions: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             QuickActionButton(icon: "arrow.up.right", title: "Send") {
                 transferMode = .send
                 showTransfer = true
@@ -104,6 +108,9 @@ struct HomeView: View {
             QuickActionButton(icon: "plus", title: "Top up") {
                 transferMode = .topUp
                 showTransfer = true
+            }
+            QuickActionButton(icon: "target", title: "Goals") {
+                showGoals = true
             }
             QuickActionButton(icon: "clock", title: "History") {
                 showAll = true

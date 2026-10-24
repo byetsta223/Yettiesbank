@@ -1698,9 +1698,16 @@ function appURL() {
   return window.location.href.split('#')[0];
 }
 
+function appIsLocalOnly() {
+  return !window.isSecureContext || (window.location.protocol !== 'https:' && window.location.protocol !== 'http:');
+}
+
 function installHTML() {
-  return sheetHead('Install Yetties Bank', 'Add it to your home screen like a native app.') +
-    '<label class="form-label">Step 1 · Copy the app link</label>' +
+  let html = sheetHead('Install Yetties Bank', 'Add it to your home screen like a native app.');
+  if (appIsLocalOnly()) {
+    html += '<div class="flow-warning">⚠️ This copy runs inside the builder app, so its link only works here. Safari needs a hosted https copy — publish the project to GitHub Pages, then this sheet will show that link.</div>';
+  }
+  html += '<label class="form-label">Step 1 · Copy the app link</label>' +
     '<input class="input" readonly value="' + esc(appURL()) + '">' +
     '<button class="btn btn-primary btn-full" data-action="copy-install-link">📋 Copy link</button>' +
     '<label class="form-label">Step 2 · Open it in Safari</label>' +
@@ -1708,6 +1715,7 @@ function installHTML() {
     '<label class="form-label">Step 3 · Add to Home Screen</label>' +
     '<div class="sheet-footer-note">In Safari, tap the Share button, then choose Add to Home Screen.</div>' +
     '<div class="sheet-footer-note">Launch Yetties Bank from your home screen — it runs standalone, keeps your sign-in, and works offline.</div>';
+  return html;
 }
 
 function copyInstallLink() {

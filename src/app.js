@@ -728,6 +728,15 @@ function profileHTML() {
   }
   html += '</div><div class="sheet-footer-note">Every card purchase is rounded up to the next whole dollar and the difference is saved into the chosen goal.</div>';
 
+  html += '<div class="profile-section-label">App</div>';
+  html += '<div class="list-card"><button class="row" data-action="install-app">' +
+    '<span class="row-icon" style="background:#E2F3EC">⬇️</span>' +
+    '<span class="row-main"><span class="row-title">Install on home screen</span>' +
+    '<span class="row-sub">' + (isStandalone()
+      ? 'Running as an installed app'
+      : 'Add Yetties Bank to your home screen like a native app') + '</span></span>' +
+    '<span class="chev">›</span></button></div>';
+
   html += '<div class="profile-section-label">Data</div>';
   html += '<div class="list-card"><button class="row" data-action="open-modal" data-type="reset-confirm">' +
     '<span class="row-icon" style="background:#ECEEF2">↩️</span>' +
@@ -930,6 +939,7 @@ function modalBodyHTML() {
   if (m.type === 'spend') return spendHTML();
   if (m.type === 'budget') return budgetHTML();
   if (m.type === 'export') return exportHTML();
+  if (m.type === 'install') return installHTML();
   if (m.type === 'reset-confirm') return resetConfirmHTML();
   return '';
 }
@@ -1561,6 +1571,12 @@ function handleAction(action, ds) {
       hapticTap('tap');
       renderFocusAware();
       break;
+    case 'install-app':
+      installApp();
+      break;
+    case 'copy-install-link':
+      copyInstallLink();
+      break;
     default:
       break;
   }
@@ -1648,8 +1664,83 @@ function handleChange(key, el) {
   }
 }
 
+/* ---------- Install (PWA) ---------- */
+
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', function (e) {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+window.addEventListener('appinstalled', function () {
+  deferredInstallPrompt = null;
+  showToast('Yetties Bank installed');
+  if (ui.signedInName) render();
+});
+
+function isStandalone() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+    window.navigator.standalone === true;
+}
+
+function installApp() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(function () { deferredInstallPrompt = null; });
+  } else if (isStandalone()) {
+    showToast('Yetties Bank is already installed');
+  } else {
+    ui.modal = { type: 'install', data: {} };
+    render();
+  }
+}
+
+function appURL() {
+  return window.location.href.split('#')[0];
+}
+
+function installHTML() {
+  return sheetHead('Install Yetties Bank', 'Add it to your home screen like a native app.') +
+    '<label class="form-label">Step 1 · Copy the app link</label>' +
+    '<input class="input" readonly value="' + esc(appURL()) + '">' +
+    '<button class="btn btn-primary btn-full" data-action="copy-install-link">📋 Copy link</button>' +
+    '<label class="form-label">Step 2 · Open it in Safari</label>' +
+    '<div class="sheet-footer-note">Paste the link into Safari on this iPhone.</div>' +
+    '<label class="form-label">Step 3 · Add to Home Screen</label>' +
+    '<div class="sheet-footer-note">In Safari, tap the Share button, then choose Add to Home Screen.</div>' +
+    '<div class="sheet-footer-note">Launch Yetties Bank from your home screen — it runs standalone, keeps your sign-in, and works offline.</div>';
+}
+
+function copyInstallLink() {
+  const url = appURL();
+  const done = function () {
+    showToast('Link copied — open it in Safari');
+    hapticTap('success');
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, function () { fallbackCopy(url); done(); });
+  } else {
+    fallbackCopy(url);
+    done();
+  }
+}
+
+function fallbackCopy(text) {
+  const input = document.createElement('textarea');
+  input.value = text;
+  document.body.appendChild(input);
+  input.select();
+  try { document.execCommand('copy'); } catch (e) { /* copy not available */ }
+  input.remove();
+}
+
 /* ---------- Init ---------- */
 
 store.load();
 store.onChange(function () { render(); });
 render();
+
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  navigator.serviceWorker.register('./sw.js').catch(function () {
+    /* offline support unavailable in this context */
+  });
+}

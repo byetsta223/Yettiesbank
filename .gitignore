@@ -1,6 +1,9 @@
 # Milq metadata (conversation history, project settings, etc.)
 .milq_meta/
 
+# Deployment bundle (regenerate from src/ — never commit a stale copy)
+web-deploy/
+
 # Build artifacts
 *_build/
 

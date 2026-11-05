@@ -1,7 +1,7 @@
 /* Yetties Bank service worker — caches the app shell so the installed
    app opens offline. Bump CACHE to ship new files to installed apps. */
 
-const CACHE = 'yetties-v1';
+const CACHE = 'yetties-v5';
 
 const ASSETS = [
   './',

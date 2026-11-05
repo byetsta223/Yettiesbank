@@ -16,12 +16,12 @@ const ui = {
   flow: null,
   flowContext: 'tab',
   revealedCardID: null,
-  hiddenVirtual: {},
   allFilterID: null,
   allSearch: '',
   insightsOffset: 0,
   monthlyBudget: parseFloat(localStorage.getItem('monthlyBudget')) || 3000,
   gateMode: null,
+  sync: { mode: 'signup', email: '', password: '', name: '' },
   signin: { name: '', email: '', password: '', confirm: '' },
   exportMonth: Date.now()
 };
@@ -198,30 +198,41 @@ function homeHTML() {
     '<div class="balance-sub">' + store.accounts.length + ' accounts · updated just now</div></div>';
 
   html += '<div class="qa-grid">' +
-    '<button class="qa-btn" data-action="open-flow" data-mode="send"><span class="qa-icon">↗️</span>Send</button>' +
-    '<button class="qa-btn" data-action="open-flow" data-mode="topup"><span class="qa-icon">➕</span>Top up</button>' +
+    '<button class="qa-btn" data-action="open-modal" data-type="add-tx"><span class="qa-icon">➕</span>Add tx</button>' +
+    '<button class="qa-btn" data-action="open-flow" data-mode="send"><span class="qa-icon">↔️</span>Move</button>' +
     '<button class="qa-btn" data-action="open-page" data-type="goals"><span class="qa-icon">🎯</span>Goals</button>' +
     '<button class="qa-btn" data-action="open-page" data-type="all"><span class="qa-icon">🕒</span>History</button></div>';
 
-  html += '<div class="section-h"><h2>Accounts</h2></div><div class="list-card">';
-  for (const a of store.accounts) {
-    html += '<button class="row" data-action="open-account" data-id="' + a.id + '">' +
-      '<span class="avatar" style="background:#' + a.colorHex + '">' + esc(a.name[0]) + '</span>' +
-      '<span class="row-main"><span class="row-title">' + esc(a.name) + '</span>' +
-      '<span class="row-sub">' + esc(a.kind) + ' · ' + esc(a.number) + '</span></span>' +
-      '<span class="row-value">' + (store.hideBalances ? '••••' : currencyString(a.balance)) + '</span>' +
-      '<span class="chev">›</span></button>';
-  }
-  html += '</div>';
-
-  html += '<div class="section-h"><h2>Upcoming payments</h2>' +
-    '<button class="plus-btn" data-action="open-modal" data-type="schedule-bill">＋</button></div>';
-  const items = upcomingItems();
-  if (!items.length) html += '<div class="empty-note">No upcoming payments scheduled</div>';
-  else {
+  html += '<div class="section-h"><h2>Accounts</h2>' +
+    '<button class="plus-btn" data-action="open-modal" data-type="add-account">＋</button></div>';
+  if (!store.accounts.length) {
+    html += '<div class="panel" style="text-align:center;margin-top:0"><div style="font-size:30px">🏦</div>' +
+      '<div style="font-weight:700;margin-top:8px">Add your first account</div>' +
+      '<div style="font-size:13px;color:var(--subtle);margin-top:4px">A checking account, a credit card, cash — whatever you want to track.</div>' +
+      '<button class="btn btn-primary btn-full" data-action="open-modal" data-type="add-account">＋ Add account</button></div>';
+  } else {
     html += '<div class="list-card">';
-    for (const item of items) html += upcomingRowHTML(item);
+    for (const a of store.accounts) {
+      html += '<button class="row" data-action="open-account" data-id="' + a.id + '">' +
+        '<span class="avatar" style="background:#' + a.colorHex + '">' + esc(a.name[0]) + '</span>' +
+        '<span class="row-main"><span class="row-title">' + esc(a.name) + '</span>' +
+        '<span class="row-sub">' + esc(a.kind) + (a.number ? ' · ' + esc(a.number) : '') + '</span></span>' +
+        '<span class="row-value">' + (store.hideBalances ? '••••' : currencyString(store.balanceOf(a))) + '</span>' +
+        '<span class="chev">›</span></button>';
+    }
     html += '</div>';
+  }
+
+  if (store.accounts.length) {
+    html += '<div class="section-h"><h2>Upcoming payments</h2>' +
+      '<button class="plus-btn" data-action="open-modal" data-type="schedule-bill">＋</button></div>';
+    const items = upcomingItems();
+    if (!items.length) html += '<div class="empty-note">No upcoming payments scheduled</div>';
+    else {
+      html += '<div class="list-card">';
+      for (const item of items) html += upcomingRowHTML(item);
+      html += '</div>';
+    }
   }
 
   html += '<div class="section-h"><h2>Recent activity</h2>' +
@@ -241,8 +252,8 @@ function cardVisualHTML(account, revealed) {
   const holder = esc((ui.signedInName || 'Card Holder').toUpperCase());
   const master = account.cardNumber.indexOf('5') === 0
     ? '<span class="mc-mark"><span class="mc-red"></span><span class="mc-orange"></span></span>' : '';
-  return '<div class="card-visual' + (account.isFrozen ? ' frozen' : '') +
-    '" style="--card-color:#' + account.colorHex + ';--card-shadow:rgba(' + hexToRgb(account.colorHex) + ',0.35)">' +
+  return '<div class="card-visual"' +
+    ' style="--card-color:#' + account.colorHex + ';--card-shadow:rgba(' + hexToRgb(account.colorHex) + ',0.35)">' +
     '<span class="deco1"></span><span class="deco2"></span>' +
     '<div class="card-top"><div><div class="card-name">' + esc(account.name) + '</div>' +
     '<div class="card-kind">' + esc(account.kind) + '</div></div>' +
@@ -250,7 +261,6 @@ function cardVisualHTML(account, revealed) {
     '<div class="card-number">' + number + '</div>' +
     '<div class="card-bottom"><span>' + holder + '</span><span class="grow"></span>' +
     '<span>' + esc(account.expiry) + '</span>' + master + '</div>' +
-    (account.isFrozen ? '<div class="card-frozen-overlay"><span class="flake">❄️</span><span>Frozen</span></div>' : '') +
     '</div>';
 }
 
@@ -273,64 +283,22 @@ function cardBlockHTML(account) {
   const revealed = ui.revealedCardID === account.id;
   return '<div class="card-block">' +
     cardVisualHTML(account, revealed) +
-    '<div class="card-controls">' +
-    '<button class="btn' + (account.isFrozen ? ' btn-frozen' : '') + '" data-action="freeze-card" data-id="' + account.id + '">❄️ ' +
-    (account.isFrozen ? 'Unfreeze' : 'Freeze') + '</button>' +
+    '<div class="card-controls" style="grid-template-columns:1fr">' +
     '<button class="btn" data-action="toggle-reveal" data-id="' + account.id + '">' +
     (revealed ? '🙈 Hide number' : '👁️ Reveal number') + '</button></div>' +
     accountSettingsHTML(account) + '</div>';
 }
 
-function miniCardVisual(card, source, revealed, usedUp) {
-  const colorHex = source ? source.colorHex : '35507B';
-  const number = revealed ? formatCardNumber(card.cardNumber) : maskedCardNumber(card.cardNumber);
-  return '<div class="card-visual' + (card.isFrozen ? ' frozen' : '') +
-    '" style="--card-color:#' + colorHex + ';--card-shadow:rgba(' + hexToRgb(colorHex) + ',0.35)">' +
-    '<span class="deco1"></span><span class="deco2"></span>' +
-    '<div class="card-top"><div><div class="card-name">Virtual card</div>' +
-    '<div class="card-kind">Single-use · ' + esc(source ? source.name : 'Card account') + '</div></div>' +
-    (usedUp
-      ? '<span style="background:rgba(255,255,255,0.85);color:var(--ink);font-size:11px;font-weight:800;padding:5px 10px;border-radius:12px">Used up</span>'
-      : '<span class="card-wave">✨</span>') + '</div>' +
-    '<div class="card-number">' + number + '</div>' +
-    '<div class="card-bottom"><span>' + esc((ui.signedInName || 'Card Holder').toUpperCase()) + '</span><span class="grow"></span>' +
-    (revealed ? '<span>CVC ' + esc(card.cvc) + '</span>' : '') +
-    '<span>' + esc(card.expiry) + '</span></div>' +
-    (card.isFrozen ? '<div class="card-frozen-overlay"><span class="flake">❄️</span><span>Frozen</span></div>' : '') +
-    '</div>';
-}
-
-function virtualCardsHTML() {
-  let html = '<div class="section-h" style="margin-top:34px"><h2>Virtual cards</h2></div>';
-  for (const card of store.virtualCards) {
-    const source = store.accountById(card.sourceAccountID);
-    const isRevealed = !ui.hiddenVirtual[card.id];
-    const usedUp = card.limit > 0 && card.limit - card.spent < 0.01;
-    const fraction = card.limit > 0 ? Math.min(card.spent / card.limit, 1) : 0;
-    html += '<div class="vc-card">' +
-      miniCardVisual(card, source, isRevealed, usedUp) +
-      '<div class="vc-usage"><div class="vc-usage-top"><span>Limit ' + currencyString(card.limit, { cents: false }) + '</span>' +
-      '<span style="' + (usedUp ? 'color:var(--mint)' : 'color:var(--subtle)') + '">' +
-      (usedUp ? 'Fully used' : currencyString(card.limit - card.spent, { cents: false }) + ' left') + '</span></div>' +
-      '<div class="bar"><div class="bar-fill" style="width:' + Math.round(fraction * 100) + '%"></div></div></div>' +
-      '<div class="card-controls">' +
-      '<button class="btn' + (card.isFrozen ? ' btn-frozen' : '') + '" data-action="freeze-vc" data-id="' + card.id + '">❄️ ' +
-      (card.isFrozen ? 'Unfreeze' : 'Freeze') + '</button>' +
-      '<button class="btn" data-action="toggle-vc-details" data-id="' + card.id + '">' +
-      (isRevealed ? '🙈 Hide details' : '👁️ Show details') + '</button></div>' +
-      '<button class="btn btn-full ' + (usedUp ? 'btn-disabled' : 'btn-primary') + '" data-action="open-modal" data-type="spend" data-id="' + card.id + '"' +
-      (usedUp ? ' disabled' : '') + '>🛒 ' + (usedUp ? 'Limit reached' : 'Spend') + '</button>' +
-      '</div>';
-  }
-  html += '<button class="dashed-btn" data-action="open-modal" data-type="add-virtual-card">＋ Add virtual card</button>';
-  return html;
-}
-
 function cardsHTML() {
   const cards = store.accounts.filter(function (a) { return a.isCard; });
   let html = '<div class="screen-body"><div class="page-title-lg">Cards</div>';
+  if (!cards.length) {
+    html += '<div class="panel" style="text-align:center;margin-top:14px"><div style="font-size:30px">💳</div>' +
+      '<div style="font-weight:700;margin-top:8px">No cards yet</div>' +
+      '<div style="font-size:13px;color:var(--subtle);margin-top:4px">Add an account with a card on it and it appears here.</div></div>';
+  }
   for (const account of cards) html += cardBlockHTML(account);
-  html += virtualCardsHTML() + '</div>';
+  html += '</div>';
   return html;
 }
 
@@ -340,10 +308,8 @@ function openFlow(mode, context) {
   ui.flowContext = context;
   ui.flow = {
     mode: mode, step: 'amount', amountText: '',
-    recipientMode: mode === 'send' ? 'contacts' : 'accounts',
     fromID: store.accounts.length ? store.accounts[0].id : null,
-    toContactID: null, toAccountID: null,
-    newName: '', newHandle: '', question: '', answer: '', note: '',
+    toAccountID: null, note: '',
     repeatEnabled: false, repeatFrequency: 'Monthly'
   };
 }
@@ -352,8 +318,7 @@ function resetFlow() {
   const f = ui.flow;
   if (!f) return;
   f.step = 'amount'; f.amountText = ''; f.note = '';
-  f.toContactID = null; f.toAccountID = null;
-  f.newName = ''; f.newHandle = ''; f.question = ''; f.answer = '';
+  f.toAccountID = null;
   f.repeatEnabled = false; f.repeatFrequency = 'Monthly';
 }
 
@@ -367,9 +332,7 @@ function flowHTML(embedded) {
 
 function flowHasRecipient() {
   const f = ui.flow;
-  if (f.recipientMode === 'accounts') return !!f.toAccountID;
-  if (f.recipientMode === 'contacts') return !!f.toContactID;
-  return f.newName.trim() !== '' && f.newHandle.trim() !== '';
+  return !!f.toAccountID && f.toAccountID !== f.fromID;
 }
 
 function flowCanProceed() {
@@ -377,7 +340,7 @@ function flowCanProceed() {
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
   if (!from) return false;
-  return amount > 0 && amount <= from.balance && flowHasRecipient();
+  return amount > 0 && amount <= store.balanceOf(from) && flowHasRecipient();
 }
 
 function keypadHTML() {
@@ -393,54 +356,31 @@ function flowAmountHTML(embedded) {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  const title = f.mode === 'send' ? 'Send money' : 'Top up';
+  const title = f.mode === 'send' ? 'Move money' : 'Top up';
   let html = '<div class="flow-head"><div class="sheet-title">' + esc(title) + '</div>' +
     (embedded ? '' : '<button class="close-x" data-action="modal-close">✕</button>') + '</div>';
 
   html += '<div class="flow-amount"><div class="flow-amount-big' + (amount > 0 ? '' : ' muted') + '">$' +
     esc(f.amountText || '0') + '</div>' +
-    '<div class="flow-available">Available ' + currencyString(from ? from.balance : 0) + '</div></div>';
+    '<div class="flow-available">Available ' + currencyString(from ? store.balanceOf(from) : 0) + '</div></div>';
 
-  html += '<div class="seg seg-mint">' +
-    [['accounts', 'My accounts'], ['contacts', 'Contacts'], ['eTransfer', 'E-transfer']].map(function (m) {
-      return '<button class="seg-btn' + (f.recipientMode === m[0] ? ' active' : '') +
-        '" data-action="flow-mode" data-value="' + m[0] + '">' + m[1] + '</button>';
-    }).join('') + '</div>';
-
-  if (f.recipientMode === 'eTransfer') {
-    html += '<div style="margin-top:14px">' +
-      '<input class="input" placeholder="Recipient name" data-input="flow-newname" value="' + esc(f.newName) + '">' +
-      '<input class="input" placeholder="Email or mobile number" style="margin-top:10px" data-input="flow-newhandle" value="' + esc(f.newHandle) + '">' +
-      '</div>';
-  } else {
-    html += '<div class="person-chips">';
-    if (f.recipientMode === 'contacts') {
-      for (const c of store.contacts) {
-        html += '<button class="chip' + (f.toContactID === c.id ? ' active' : '') +
-          '" data-action="flow-contact" data-id="' + c.id + '">' +
-          '<span class="avatar avatar-sm" style="background:#' + c.colorHex + '">' + esc(c.name[0]) + '</span>' +
-          esc(c.name) + '</button>';
-      }
-    } else {
-      for (const a of store.accounts) {
-        if (a.id === f.fromID) continue;
-        html += '<button class="chip' + (f.toAccountID === a.id ? ' active' : '') +
-          '" data-action="flow-account" data-id="' + a.id + '">💳 ' + esc(a.name) + '</button>';
-      }
-    }
-    html += '</div>';
+  html += '<div class="form-label" style="margin-top:4px">Move to</div>';
+  html += '<div class="person-chips">';
+  for (const a of store.accounts) {
+    if (a.id === f.fromID) continue;
+    html += '<button class="chip' + (f.toAccountID === a.id ? ' active' : '') +
+      '" data-action="flow-account" data-id="' + a.id + '">💳 ' + esc(a.name) + '</button>';
   }
+  html += '</div>';
 
   html += '<div class="from-row">🏦 <select data-change="flow-from">' +
     store.accounts.map(function (a) {
       return '<option value="' + a.id + '"' + (f.fromID === a.id ? ' selected' : '') + '>' +
-        esc(a.name) + ' · ' + currencyString(a.balance) + '</option>';
+        esc(a.name) + ' · ' + currencyString(store.balanceOf(a)) + '</option>';
     }).join('') + '</select></div>';
 
   if (!flowHasRecipient()) {
-    const msg = f.recipientMode === 'eTransfer' ? 'Enter a name and an email or mobile number'
-      : (f.recipientMode === 'contacts' ? 'Select a contact to send to' : 'Select an account to move money to');
-    html += '<div class="flow-warning">⚠️ ' + msg + '</div>';
+    html += '<div class="flow-warning">⚠️ Select the account to move money to</div>';
   }
 
   html += '<div class="keypad">' + keypadHTML() + '</div>';
@@ -454,17 +394,11 @@ function flowContinue() {
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
   let message = null;
-  if (!from) message = 'Choose an account to send from.';
+  if (!from) message = 'Choose an account to move from.';
   else if (amount <= 0) message = 'Enter an amount greater than $0.';
-  else if (amount > from.balance) message = 'Insufficient balance in ' + from.name + '.';
-  else if (f.recipientMode === 'contacts' && !f.toContactID) message = 'Choose a contact.';
-  else if (f.recipientMode === 'eTransfer') {
-    if (!f.newName.trim()) message = "Enter the recipient's name.";
-    else if (!f.newHandle.trim()) message = 'Enter an email or mobile number.';
-  } else if (f.recipientMode === 'accounts') {
-    if (!f.toAccountID) message = 'Choose an account.';
-    else if (f.toAccountID === f.fromID) message = 'Choose a different account.';
-  }
+  else if (amount > store.balanceOf(from)) message = 'Insufficient balance in ' + from.name + '.';
+  else if (!f.toAccountID) message = 'Choose an account.';
+  else if (f.toAccountID === f.fromID) message = 'Choose a different account.';
   if (message) { showToast(message, 'error'); hapticTap('error'); return; }
   f.step = 'confirm';
   render();
@@ -474,57 +408,36 @@ function flowConfirmHTML() {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  let recipientName = '—', recipientValue = '—', heroHandle = '';
-  if (f.recipientMode === 'contacts') {
-    const c = store.contactById(f.toContactID);
-    recipientName = c ? c.name : 'a contact';
-    recipientValue = recipientName;
-  } else if (f.recipientMode === 'accounts') {
-    const a = store.accountById(f.toAccountID);
-    recipientName = a ? a.name : 'an account';
-    recipientValue = recipientName;
-  } else {
-    recipientName = f.newName.trim() || 'a new recipient';
-    recipientValue = f.newHandle.trim() || '—';
-    heroHandle = f.newHandle.trim();
-  }
+  const to = store.accountById(f.toAccountID);
+  const recipientName = to ? to.name : 'an account';
 
   let html = '<div class="flow-head"><div class="sheet-title">Confirm</div>' +
     '<button class="link-btn" data-action="flow-back">Back</button></div>';
 
-  html += '<div class="confirm-hero"><div class="hero-icon">' + (f.recipientMode === 'eTransfer' ? '✈️' : '👤') + '</div>' +
+  html += '<div class="confirm-hero"><div class="hero-icon">🔁</div>' +
     '<div class="hero-name">' + esc(recipientName) + '</div>' +
-    (heroHandle ? '<div class="hero-handle">' + esc(heroHandle) + '</div>' : '') +
     '<div class="hero-amount">' + currencyString(amount) + '</div></div>';
 
   html += '<div class="summary-card">';
   html += '<div class="summary-row"><span class="label">From</span><span class="value">' + esc(from ? from.name : '—') + '</span></div>';
-  html += '<div class="summary-row"><span class="label">To</span><span class="value">' + esc(recipientValue) + '</span></div>';
+  html += '<div class="summary-row"><span class="label">To</span><span class="value">' + esc(recipientName) + '</span></div>';
   html += '<div class="summary-row"><span class="label">Note</span><span class="value">' +
     '<input class="input" style="padding:8px 12px;text-align:right" placeholder="Optional" data-input="flow-note" value="' + esc(f.note) + '"></span></div>';
 
-  if (f.recipientMode !== 'eTransfer') {
-    html += '<label class="summary-row" style="align-items:center"><span class="label">Repeat this transfer</span>' +
-      '<input type="checkbox" class="switch" data-change="flow-repeat"' + (f.repeatEnabled ? ' checked' : '') + '></label>';
-    if (f.repeatEnabled) {
-      html += '<div><div class="form-label" style="margin-top:0">Frequency</div><div class="seg seg-mint">' +
-        ['Weekly', 'Monthly'].map(function (fr) {
-          return '<button class="seg-btn' + (f.repeatFrequency === fr ? ' active' : '') +
-            '" data-action="flow-freq" data-value="' + fr + '">' + fr + '</button>';
-        }).join('') + '</div></div>';
-    }
-  } else {
-    html += '<div class="summary-row"><span class="label">Security question</span><span class="value">' +
-      '<input class="input" style="padding:8px 12px;text-align:right" placeholder="e.g. Favourite city?" data-input="flow-question" value="' + esc(f.question) + '"></span></div>';
-    html += '<div class="summary-row"><span class="label">Answer</span><span class="value">' +
-      '<input class="input" type="password" style="padding:8px 12px;text-align:right" placeholder="Answer" data-input="flow-answer" value="' + esc(f.answer) + '"></span></div>';
+  html += '<label class="summary-row" style="align-items:center"><span class="label">Remind me again</span>' +
+    '<input type="checkbox" class="switch" data-change="flow-repeat"' + (f.repeatEnabled ? ' checked' : '') + '></label>';
+  if (f.repeatEnabled) {
+    html += '<div><div class="form-label" style="margin-top:0">Frequency</div><div class="seg seg-mint">' +
+      ['Weekly', 'Monthly'].map(function (fr) {
+        return '<button class="seg-btn' + (f.repeatFrequency === fr ? ' active' : '') +
+          '" data-action="flow-freq" data-value="' + fr + '">' + fr + '</button>';
+      }).join('') + '</div>' +
+      '<div class="sheet-footer-note">You\'ll get a reminder when it\'s due — nothing moves automatically.</div></div>';
   }
   html += '<div class="summary-row"><span class="label">Fee</span><span class="value">No fee</span></div>';
   html += '</div>';
 
-  const label = f.recipientMode === 'eTransfer' ? 'Confirm & send e-transfer'
-    : (f.mode === 'send' ? 'Confirm & send' : 'Confirm & move');
-  html += '<button class="btn btn-primary btn-full" data-action="flow-confirm">' + label + '</button>';
+  html += '<button class="btn btn-primary btn-full" data-action="flow-confirm">Confirm & move</button>';
   return html;
 }
 
@@ -532,28 +445,16 @@ function flowConfirm() {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  if (!from) return;
+  if (!from || !f.toAccountID) return;
 
-  if (f.recipientMode === 'eTransfer') {
-    if (!f.question.trim()) { showToast('Set a security question.', 'error'); hapticTap('error'); return; }
-    if (!f.answer) { showToast('Set the answer to your security question.', 'error'); hapticTap('error'); return; }
-    f.step = 'success';
-    store.sendETransfer(from.id, f.newName, f.newHandle, amount);
-  } else {
-    f.step = 'success';
-    store.performTransfer(from.id,
-      f.recipientMode === 'contacts' ? f.toContactID : null,
-      f.recipientMode === 'accounts' ? f.toAccountID : null, amount);
-    if (f.repeatEnabled) {
-      let title;
-      if (f.recipientMode === 'contacts') title = (store.contactById(f.toContactID) || { name: 'Contact' }).name;
-      else title = 'To ' + ((store.accountById(f.toAccountID) || { name: 'account' }).name);
-      store.addRecurringTransfer('transfer', title, from.id, {
-        toContactID: f.recipientMode === 'contacts' ? f.toContactID : null,
-        toAccountID: f.recipientMode === 'accounts' ? f.toAccountID : null,
-        amount: amount, frequency: f.repeatFrequency
-      });
-    }
+  f.step = 'success';
+  store.performTransfer(from.id, null, f.toAccountID, amount);
+
+  if (f.repeatEnabled) {
+    const title = 'To ' + ((store.accountById(f.toAccountID) || { name: 'account' }).name);
+    store.addRecurringTransfer('transfer', title, from.id, {
+      toAccountID: f.toAccountID, amount: amount, frequency: f.repeatFrequency
+    });
   }
   hapticTap('money');
 }
@@ -561,16 +462,12 @@ function flowConfirm() {
 function flowSuccessHTML() {
   const f = ui.flow;
   const amount = parseFloat(f.amountText) || 0;
-  let recipientName = 'recipient';
-  if (f.recipientMode === 'contacts') recipientName = (store.contactById(f.toContactID) || { name: 'contact' }).name;
-  else if (f.recipientMode === 'accounts') recipientName = (store.accountById(f.toAccountID) || { name: 'account' }).name;
-  else recipientName = f.newName.trim() || 'recipient';
-  const title = f.recipientMode === 'eTransfer' ? 'E-transfer sent' : 'Money sent';
+  const recipientName = (store.accountById(f.toAccountID) || { name: 'account' }).name;
   return '<div class="success-wrap"><div class="big-check">✅</div>' +
-    '<div class="success-title">' + title + '</div>' +
+    '<div class="success-title">Money moved</div>' +
     '<div class="success-sub">' + currencyString(amount) + ' to ' + esc(recipientName) + '</div>' +
-    (f.repeatEnabled && f.recipientMode !== 'eTransfer'
-      ? '<div class="success-repeat">Repeats ' + f.repeatFrequency.toLowerCase() + ' from now on</div>' : '') +
+    (f.repeatEnabled
+      ? '<div class="success-repeat">Reminds you ' + f.repeatFrequency.toLowerCase() + ' from now on</div>' : '') +
     '<button class="btn btn-primary btn-full" data-action="flow-done">Done</button></div>';
 }
 
@@ -714,20 +611,6 @@ function profileHTML() {
     '<label class="setting-row"><span class="setting-label">🙈 Hide balances</span>' +
     '<input type="checkbox" class="switch" data-change="pref-hide-balances"' + (store.hideBalances ? ' checked' : '') + '></label></div>';
 
-  html += '<div class="profile-section-label">Round up savings</div>';
-  html += '<div class="list-card">' +
-    '<label class="setting-row"><span class="setting-label">⬆️ Round up purchases</span>' +
-    '<input type="checkbox" class="switch" data-change="pref-roundup"' + (store.roundUpEnabled ? ' checked' : '') + '></label>';
-  if (store.roundUpEnabled) {
-    html += '<div class="setting-row"><span class="setting-label">🎯 Save to</span>' +
-      '<select data-change="pref-roundup-goal" style="border:none;background:none;font-weight:600">' +
-      store.goals.map(function (g) {
-        return '<option value="' + g.id + '"' + (store.roundUpGoalID === g.id ? ' selected' : '') + '>' +
-          esc(g.emoji + '  ' + g.name) + '</option>';
-      }).join('') + '</select></div>';
-  }
-  html += '</div><div class="sheet-footer-note">Every card purchase is rounded up to the next whole dollar and the difference is saved into the chosen goal.</div>';
-
   html += '<div class="profile-section-label">App</div>';
   html += '<div class="list-card"><button class="row" data-action="install-app">' +
     '<span class="row-icon" style="background:#E2F3EC">⬇️</span>' +
@@ -737,10 +620,49 @@ function profileHTML() {
       : 'Add Yetties Bank to your home screen like a native app') + '</span></span>' +
     '<span class="chev">›</span></button></div>';
 
+  html += '<div class="profile-section-label">Cloud sync</div>';
+  html += '<div class="list-card">';
+  if (syncSignedIn()) {
+    const user = syncUser() || {};
+    html += '<div class="setting-row"><span class="setting-label">☁️ ' + esc(user.name || '') +
+      ' · ' + esc(user.email || '') + '</span></div>';
+    html += '<button class="row" data-action="sync-push">' +
+      '<span class="row-icon" style="background:#E2F3EC">⬆️</span>' +
+      '<span class="row-main"><span class="row-title">Back up now</span>' +
+      '<span class="row-sub">' + (lastBackupLabel() || 'Not backed up yet') + '</span></span></button>';
+    html += '<button class="row" data-action="sync-pull">' +
+      '<span class="row-icon" style="background:#E1E8FA">⬇️</span>' +
+      '<span class="row-main"><span class="row-title">Restore from cloud</span>' +
+      '<span class="row-sub">Replaces what is on this device</span></span></button>';
+    html += '<button class="row" data-action="sync-signout">' +
+      '<span class="row-icon" style="background:#ECEEF2">🚪</span>' +
+      '<span class="row-main"><span class="row-title">Sign out of cloud</span></span></button>';
+  } else {
+    html += '<div class="sheet-footer-note" style="padding:12px 16px 0">Connect the sync server you deployed from the backend folder in this project (backend/README.md has the steps). Data backs up to your own server and syncs across your devices.</div>';
+    html += '<div class="setting-row"><span class="setting-label">🔗 API URL</span>' +
+      '<input class="input" style="flex:1;border:none;background:none;font-weight:600;text-align:right" data-input="sync-api-url" placeholder="https://yetties-api.yourname.workers.dev" value="' + esc(syncApiBase()) + '"></div>';
+    html += '<div class="setting-row"><span class="setting-label">📧 Email</span>' +
+      '<input class="input" style="flex:1;border:none;background:none;font-weight:600;text-align:right" data-input="sync-email" value="' + esc(ui.sync.email) + '"></div>';
+    html += '<div class="setting-row"><span class="setting-label">🔑 Password</span>' +
+      '<input type="password" class="input" style="flex:1;border:none;background:none;font-weight:600;text-align:right" data-input="sync-password" value="' + esc(ui.sync.password) + '"></div>';
+    if (ui.sync.mode === 'signup') {
+      html += '<div class="setting-row"><span class="setting-label">👤 Name</span>' +
+        '<input class="input" style="flex:1;border:none;background:none;font-weight:600;text-align:right" data-input="sync-name" value="' + esc(ui.sync.name) + '"></div>';
+    }
+    html += '<div class="seg seg-mint" style="margin:4px 16px 12px">' +
+      '<button class="seg-btn' + (ui.sync.mode === 'signup' ? ' active' : '') + '" data-action="sync-mode" data-value="signup">Create account</button>' +
+      '<button class="seg-btn' + (ui.sync.mode === 'login' ? ' active' : '') + '" data-action="sync-mode" data-value="login">Sign in</button>' +
+      '</div>';
+    html += '<div style="padding:0 16px 16px">' +
+      '<button class="btn btn-primary" data-action="sync-auth" data-mode="' + ui.sync.mode + '">' +
+      (ui.sync.mode === 'signup' ? 'Create cloud account' : 'Sign in to cloud') + '</button></div>';
+  }
+  html += '</div>';
+
   html += '<div class="profile-section-label">Data</div>';
   html += '<div class="list-card"><button class="row" data-action="open-modal" data-type="reset-confirm">' +
-    '<span class="row-icon" style="background:#ECEEF2">↩️</span>' +
-    '<span class="row-main"><span class="row-title">Reset demo data</span></span><span class="chev">›</span></button></div>';
+    '<span class="row-icon" style="background:#FBE4E4">🗑️</span>' +
+    '<span class="row-main"><span class="row-title">Erase all data</span></span><span class="chev">›</span></button></div>';
 
   html += '<div class="list-card" style="margin-top:20px"><button class="row" data-action="sign-out">' +
     '<span class="row-icon" style="background:#FBE4E4">🚪</span>' +
@@ -871,10 +793,10 @@ function accountPageHTML(id) {
   if (!account) return pageHeader('Account', '');
   const txs = store.transactionsFor(account.id);
   let html = pageHeader(account.name,
-    '<button class="link-btn" data-action="open-modal" data-type="export" data-id="' + account.id + '">⬆️ Export</button>');
+    '<button class="link-btn" data-action="open-modal" data-type="edit-account" data-id="' + account.id + '">Edit</button>');
   html += '<div class="screen-body">';
-  html += '<div class="balance-row"><span class="br-label">Available balance</span>' +
-    '<span class="br-value">' + (store.hideBalances ? '••••' : currencyString(account.balance)) + '</span></div>';
+  html += '<div class="balance-row"><span class="br-label">Balance</span>' +
+    '<span class="br-value">' + (store.hideBalances ? '••••' : currencyString(store.balanceOf(account))) + '</span></div>';
   html += '<div class="section-h"><h2>Activity</h2></div>';
   html += '<div class="list-card" style="padding:4px 16px">';
   if (!txs.length) html += '<div class="empty-note" style="box-shadow:none">No activity yet</div>';
@@ -892,6 +814,22 @@ function openModal(type, data) {
     if (!tx) return;
     m.data.merchant = tx.merchant;
     m.data.category = tx.category;
+    m.data.type = tx.amount < 0 ? 'expense' : 'income';
+    m.data.amount = String(Math.abs(tx.amount));
+    m.data.date = toISODate(tx.date);
+  } else if (type === 'add-tx') {
+    m.data = { accountId: store.accounts.length ? store.accounts[0].id : null,
+      type: 'expense', amount: '', merchant: '', category: 'Groceries', date: toISODate(Date.now()) };
+  } else if (type === 'add-account') {
+    m.data = { name: '', kind: 'Checking', number: '', openingBalance: '', isCard: false };
+  } else if (type === 'edit-account') {
+    const account = store.accountById(data.id);
+    if (!account) return;
+    m.data = { id: account.id, name: account.name, kind: account.kind, number: account.number,
+      openingBalance: String(account.openingBalance !== undefined ? account.openingBalance : account.balance),
+      isCard: account.isCard, cardNumber: account.cardNumber, expiry: account.expiry };
+  } else if (type === 'delete-account') {
+    m.data = { id: data.id };
   } else if (type === 'schedule-bill') {
     m.data = { payeeIndex: -1, newPayee: '', amount: '',
       accountID: store.accounts.length ? store.accounts[0].id : null,
@@ -901,10 +839,6 @@ function openModal(type, data) {
   } else if (type === 'contribute') {
     m.data = { goalID: data.id, accountID: store.accounts.length ? store.accounts[0].id : null,
       amount: '', repeat: 'none' };
-  } else if (type === 'add-virtual-card') {
-    m.data = { sourceID: null, limit: '100' };
-  } else if (type === 'spend') {
-    m.data = { id: data.id, amount: '' };
   } else if (type === 'budget') {
     m.data = { amount: String(ui.monthlyBudget) };
   } else if (type === 'export') {
@@ -935,9 +869,11 @@ function modalBodyHTML() {
   if (m.type === 'schedule-bill') return scheduleBillHTML();
   if (m.type === 'create-goal') return createGoalHTML();
   if (m.type === 'contribute') return contributeHTML();
-  if (m.type === 'add-virtual-card') return addVirtualCardHTML();
-  if (m.type === 'spend') return spendHTML();
   if (m.type === 'budget') return budgetHTML();
+  if (m.type === 'add-tx') return addTxHTML();
+  if (m.type === 'add-account') return addAccountHTML();
+  if (m.type === 'edit-account') return editAccountHTML();
+  if (m.type === 'delete-account') return deleteAccountHTML();
   if (m.type === 'export') return exportHTML();
   if (m.type === 'install') return installHTML();
   if (m.type === 'reset-confirm') return resetConfirmHTML();
@@ -950,22 +886,78 @@ function editTxHTML() {
   const d = ui.modal.data;
   const cats = store.editorCategories().slice();
   if (cats.indexOf(d.category) === -1) cats.unshift(d.category);
-  return sheetHead('Edit transaction', currencyString(tx.amount, { showSign: true }) + ' · ' + dayLabel(tx.date)) +
+  const expense = d.type !== 'income';
+  return sheetHead('Edit transaction') +
+    '<div class="seg seg-mint" style="margin-top:12px">' +
+    '<button class="seg-btn' + (expense ? ' active' : '') + '" data-action="tx-type" data-value="expense">Expense</button>' +
+    '<button class="seg-btn' + (!expense ? ' active' : '') + '" data-action="tx-type" data-value="income">Income</button></div>' +
+    '<label class="form-label">Amount</label>' +
+    '<input class="input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" data-input="tx-amount" value="' + esc(d.amount) + '">' +
     '<label class="form-label">Merchant</label>' +
     '<input class="input" data-input="tx-merchant" value="' + esc(d.merchant) + '">' +
     '<label class="form-label">Category</label>' +
     '<select class="input" data-change="tx-category">' + cats.map(function (c) {
       return '<option' + (c === d.category ? ' selected' : '') + '>' + esc(c) + '</option>';
     }).join('') + '</select>' +
-    '<button class="btn btn-primary btn-full" data-action="tx-save">Save changes</button>';
+    '<label class="form-label">Date</label>' +
+    '<input class="input" type="date" data-input="tx-date" value="' + esc(d.date) + '">' +
+    '<button class="btn btn-primary btn-full" data-action="tx-save">Save changes</button>' +
+    '<button class="btn btn-danger btn-full" data-action="tx-delete">Delete transaction</button>';
+}
+
+function addTxHTML() {
+  const d = ui.modal.data;
+  return sheetHead('Add transaction') +
+    '<label class="form-label">Account</label>' +
+    '<select class="input" data-change="tx-account">' + store.accounts.map(function (a) {
+      return '<option value="' + a.id + '"' + (d.accountId === a.id ? ' selected' : '') + '>' + esc(a.name) + '</option>';
+    }).join('') + '</select>' +
+    '<div class="seg seg-mint" style="margin-top:12px">' +
+    '<button class="seg-btn' + (d.type !== 'income' ? ' active' : '') + '" data-action="tx-type" data-value="expense">Expense</button>' +
+    '<button class="seg-btn' + (d.type === 'income' ? ' active' : '') + '" data-action="tx-type" data-value="income">Income</button></div>' +
+    '<label class="form-label">Amount</label>' +
+    '<input class="input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" data-input="tx-amount" value="' + esc(d.amount) + '">' +
+    '<label class="form-label">Merchant</label>' +
+    '<input class="input" placeholder="e.g. Blue Bottle Coffee" data-input="tx-merchant" value="' + esc(d.merchant) + '">' +
+    '<label class="form-label">Category</label>' +
+    '<select class="input" data-change="tx-category">' + FIXED_CATEGORIES.map(function (c) {
+      return '<option' + (c === d.category ? ' selected' : '') + '>' + esc(c) + '</option>';
+    }).join('') + '</select>' +
+    '<label class="form-label">Date</label>' +
+    '<input class="input" type="date" data-input="tx-date" value="' + esc(d.date) + '">' +
+    '<button class="btn btn-primary btn-full" data-action="add-tx-save">Add transaction</button>';
+}
+
+function addTxSave() {
+  const d = ui.modal.data;
+  const merchant = (d.merchant || '').trim();
+  const amount = parseFloat(d.amount) || 0;
+  if (!d.accountId || !store.accountById(d.accountId)) { showToast('Choose an account.', 'error'); hapticTap('error'); return; }
+  if (!(amount > 0)) { showToast('Enter an amount greater than $0.', 'error'); hapticTap('error'); return; }
+  ui.modal = null;
+  store.addTransaction({ accountId: d.accountId, merchant: merchant,
+    category: d.category, amount: amount, type: d.type, date: isoToDate(d.date) });
+  hapticTap('success');
+  showToast('Transaction added');
+}
+
+function txDelete() {
+  const d = ui.modal.data;
+  ui.modal = null;
+  store.deleteTransaction(d.id);
+  hapticTap('freeze');
+  showToast('Transaction deleted');
 }
 
 function txSave() {
   const d = ui.modal.data;
   const merchant = (d.merchant || '').trim();
   if (!merchant) { showToast('Enter a merchant name.', 'error'); hapticTap('error'); return; }
+  const amount = parseFloat(d.amount) || 0;
+  if (!(amount > 0)) { showToast('Enter an amount greater than $0.', 'error'); hapticTap('error'); return; }
+  const signed = d.type === 'income' ? amount : -amount;
   ui.modal = null;
-  store.updateTransaction(d.id, merchant, d.category);
+  store.updateTransaction(d.id, merchant, d.category, signed);
 }
 
 function scheduleBillHTML() {
@@ -1011,6 +1003,86 @@ function scheduleSubmit() {
   showToast('Payment scheduled');
 }
 
+function addAccountHTML() {
+  const d = ui.modal.data;
+  return sheetHead('Add account') +
+    '<label class="form-label">Name</label>' +
+    '<input class="input" placeholder="e.g. Everyday checking" data-input="account-name" value="' + esc(d.name) + '">' +
+    '<label class="form-label">Type</label>' +
+    '<select class="input" data-change="account-kind">' +
+    ['Checking', 'Savings', 'Prepaid card', 'Credit card', 'Cash', 'Other'].map(function (k) {
+      return '<option' + (k === d.kind ? ' selected' : '') + '>' + esc(k) + '</option>';
+    }).join('') + '</select>' +
+    '<label class="form-label">Account number (optional)</label>' +
+    '<input class="input" placeholder="Last 4 digits, e.g. 4821" data-input="account-number" value="' + esc(d.number) + '">' +
+    '<label class="form-label">Opening balance</label>' +
+    '<input class="input" type="number" inputmode="decimal" step="0.01" placeholder="0.00" data-input="account-opening" value="' + esc(d.openingBalance) + '">' +
+    '<label class="setting-row" style="border-bottom:none"><span class="setting-label">💳 Show in Cards</span>' +
+    '<input type="checkbox" class="switch" data-change="account-iscard"' + (d.isCard ? ' checked' : '') + '></label>' +
+    '<div class="sheet-footer-note">Opening balance is what the account holds today. For credit cards, use a negative number for what you owe. Balance = opening balance + everything you log.</div>' +
+    '<button class="btn btn-primary btn-full" data-action="account-save">Add account</button>';
+}
+
+function accountSave() {
+  const d = ui.modal.data;
+  const name = (d.name || '').trim();
+  if (!name) { showToast('Give the account a name.', 'error'); hapticTap('error'); return; }
+  ui.modal = null;
+  if (d.id) {
+    store.updateAccount(d.id, { name: name, kind: d.kind, number: d.number,
+      openingBalance: parseFloat(d.openingBalance) || 0, isCard: d.isCard });
+    showToast('Account updated');
+  } else {
+    store.addAccount({ name: name, kind: d.kind, number: d.number,
+      openingBalance: parseFloat(d.openingBalance) || 0, isCard: d.isCard });
+    showToast('Account added');
+  }
+  hapticTap('success');
+}
+
+function editAccountHTML() {
+  const d = ui.modal.data;
+  const account = store.accountById(d.id);
+  if (!account) return '';
+  return sheetHead('Edit account', account.name) +
+    '<label class="form-label">Name</label>' +
+    '<input class="input" data-input="account-name" value="' + esc(d.name) + '">' +
+    '<label class="form-label">Type</label>' +
+    '<select class="input" data-change="account-kind">' +
+    ['Checking', 'Savings', 'Prepaid card', 'Credit card', 'Cash', 'Other'].map(function (k) {
+      return '<option' + (k === d.kind ? ' selected' : '') + '>' + esc(k) + '</option>';
+    }).join('') + '</select>' +
+    '<label class="form-label">Account number</label>' +
+    '<input class="input" data-input="account-number" value="' + esc(d.number) + '">' +
+    '<label class="form-label">Opening balance</label>' +
+    '<input class="input" type="number" inputmode="decimal" step="0.01" data-input="account-opening" value="' + esc(d.openingBalance) + '">' +
+    '<label class="setting-row" style="border-bottom:none"><span class="setting-label">💳 Show in Cards</span>' +
+    '<input type="checkbox" class="switch" data-change="account-iscard"' + (d.isCard ? ' checked' : '') + '></label>' +
+    '<div class="sheet-footer-note">Balance = opening balance + every transaction you log. Fix a back-dated mistake by adjusting the opening balance.</div>' +
+    '<button class="btn btn-primary btn-full" data-action="account-save">Save changes</button>' +
+    '<button class="btn btn-danger btn-full" data-action="open-modal" data-type="delete-account" data-id="' + d.id + '">Delete account</button>';
+}
+
+function deleteAccountHTML() {
+  const d = ui.modal.data;
+  const account = store.accountById(d.id);
+  if (!account) return '';
+  const count = store.transactionsFor(account.id).length;
+  return sheetHead('Delete "' + account.name + '"?',
+    'The account and its ' + count + ' transaction' + (count === 1 ? '' : 's') + ' will be permanently removed.') +
+    '<button class="btn btn-danger btn-full" data-action="account-delete">Delete</button>' +
+    '<button class="btn btn-full" data-action="modal-close">Cancel</button>';
+}
+
+function accountDelete() {
+  const d = ui.modal.data;
+  ui.modal = null;
+  store.deleteAccount(d.id);
+  if (ui.page && ui.page.type === 'account' && ui.page.id === d.id) ui.page = null;
+  hapticTap('freeze');
+  showToast('Account deleted');
+}
+
 function createGoalHTML() {
   const d = ui.modal.data;
   const emojis = ['✈️', '💻', '🚨', '🏠', '📱', '🚗', '🎓', '💍', '🏖️', '🎸'];
@@ -1054,7 +1126,7 @@ function contributeHTML() {
   }
   const account = store.accountById(d.accountID);
   const amount = parseFloat(d.amount) || 0;
-  const exceeded = account && account.balance < amount;
+  const exceeded = account && store.balanceOf(account) < amount;
   const after = goal.saved + Math.max(amount, 0);
   let html = sheetHead('Contribute');
   html += '<div class="goal-card" style="margin-top:10px">' +
@@ -1071,7 +1143,7 @@ function contributeHTML() {
     html += '<button class="radio-row" data-action="contribute-account" data-id="' + acc.id + '">' +
       '<span class="avatar avatar-sm" style="background:#' + acc.colorHex + '">' + esc(acc.name[0]) + '</span>' +
       '<span class="row-main"><span class="row-title">' + esc(acc.name) + '</span>' +
-      '<span class="row-sub">' + currencyString(acc.balance) + '</span></span>' +
+      '<span class="row-sub">' + currencyString(store.balanceOf(acc)) + '</span></span>' +
       '<span class="radio-circle' + (selected ? ' on' : '') + '"></span></button>';
   }
   html += '</div>';
@@ -1108,7 +1180,7 @@ function contributeSubmit() {
   const account = store.accountById(d.accountID);
   if (!goal || !account) return;
   if (!(amount > 0)) { showToast('Enter an amount greater than $0.', 'error'); hapticTap('error'); return; }
-  if (account.balance < amount) { showToast('Amount exceeds the account balance.', 'error'); hapticTap('error'); return; }
+  if (store.balanceOf(account) < amount) { showToast('Amount exceeds the account balance.', 'error'); hapticTap('error'); return; }
   if (goal.saved >= goal.target) { showToast('Goal already reached.', 'error'); hapticTap('error'); return; }
   ui.modal = null;
   store.contribute(goal.id, account.id, amount);
@@ -1117,71 +1189,6 @@ function contributeSubmit() {
       { goalID: goal.id, amount: amount, frequency: d.repeat });
   }
   hapticTap('success');
-}
-
-function addVirtualCardHTML() {
-  const d = ui.modal.data;
-  const sources = store.accounts.filter(function (a) { return a.isCard; });
-  if (!d.sourceID || !store.accountById(d.sourceID)) d.sourceID = sources.length ? sources[0].id : null;
-  let html = sheetHead('Add virtual card');
-  html += '<label class="form-label">Source card</label>';
-  html += '<select class="input" data-change="vc-source">' + sources.map(function (a) {
-    return '<option value="' + a.id + '"' + (d.sourceID === a.id ? ' selected' : '') + '>' +
-      esc(a.name) + ' · ' + maskedCardNumber(a.cardNumber) + '</option>';
-  }).join('') + '</select>';
-  html += '<label class="form-label">Spending limit</label>';
-  html += '<input class="input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="100" data-input="vc-limit" value="' + esc(d.limit) + '">';
-  html += '<div class="person-chips" style="padding:10px 0">' +
-    [50, 100, 250, 500].map(function (v) {
-      return '<button class="chip" data-action="vc-limit-chip" data-value="' + v + '">$' + v + '</button>';
-    }).join('') + '</div>';
-  html += '<div class="sheet-footer-note">The card declines any purchase that would take total spending past this limit.</div>';
-  html += '<button class="btn btn-primary btn-full" data-action="vc-create">Create virtual card</button>';
-  return html;
-}
-
-function vcCreate() {
-  const d = ui.modal.data;
-  const limit = parseFloat(d.limit) || 0;
-  if (!(limit > 0) || !store.accountById(d.sourceID)) {
-    showToast('Choose a source card and a limit above $0.', 'error'); hapticTap('error'); return;
-  }
-  ui.modal = null;
-  store.addVirtualCard(d.sourceID, limit);
-  hapticTap('success');
-  showToast('Virtual card created');
-}
-
-function spendHTML() {
-  const card = store.virtualCards.find(function (c) { return c.id === ui.modal.data.id; });
-  if (!card) return '';
-  const remaining = Math.max(card.limit - card.spent, 0);
-  return sheetHead('Spend with virtual card', 'Remaining limit ' + currencyString(remaining)) +
-    '<label class="form-label">Amount</label>' +
-    '<input class="input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0.00" data-input="spend-amount" value="' + esc(ui.modal.data.amount || '') + '">' +
-    '<button class="btn btn-primary btn-full" data-action="vc-charge">Charge</button>';
-}
-
-function vcCharge() {
-  const d = ui.modal.data;
-  const card = store.virtualCards.find(function (c) { return c.id === d.id; });
-  if (!card) return;
-  const amount = parseFloat(d.amount) || 0;
-  const remaining = Math.max(card.limit - card.spent, 0);
-  if (card.isFrozen) { showToast('This card is frozen. Unfreeze it before spending.', 'error'); hapticTap('error'); return; }
-  if (!(amount > 0)) { showToast('Enter an amount greater than zero.', 'error'); hapticTap('error'); return; }
-  if (amount > remaining + 0.001) {
-    showToast('Purchase exceeds the remaining limit of ' + currencyString(remaining) + '.', 'error');
-    hapticTap('error');
-    return;
-  }
-  ui.modal = null;
-  if (!store.spendOnVirtualCard(card.id, amount)) {
-    showToast('Purchase could not be completed. Try again.', 'error');
-    render();
-    return;
-  }
-  hapticTap('money');
 }
 
 function budgetHTML() {
@@ -1245,8 +1252,8 @@ function exportDownload() {
 }
 
 function resetConfirmHTML() {
-  return sheetHead('Reset demo data?', 'Balances and activity will return to the original demo state.') +
-    '<button class="btn btn-danger btn-full" data-action="reset-do">Reset</button>' +
+  return sheetHead('Erase everything?', 'All accounts, transactions and goals on this device will be permanently deleted. There is no undo — export a statement first if you want to keep a copy. Your cloud backup (if you have one) is not touched — sign in to cloud sync again to restore it.') +
+    '<button class="btn btn-danger btn-full" data-action="reset-do">Erase all data</button>' +
     '<button class="btn btn-full" data-action="modal-close">Cancel</button>';
 }
 
@@ -1426,29 +1433,8 @@ function handleAction(action, ds) {
       hapticTap('tap');
       render();
       break;
-    case 'toggle-vc-details':
-      ui.hiddenVirtual[ds.id] = !ui.hiddenVirtual[ds.id];
-      hapticTap('tap');
-      render();
-      break;
-    case 'freeze-vc':
-      store.toggleVirtualCardFreeze(ds.id);
-      hapticTap('freeze');
-      break;
     case 'flow-key':
       keypadPress(ds.key);
-      break;
-    case 'flow-mode':
-      ui.flow.recipientMode = ds.value;
-      if (ds.value === 'accounts') ui.flow.toContactID = null;
-      if (ds.value === 'contacts') ui.flow.toAccountID = null;
-      hapticTap('tap');
-      render();
-      break;
-    case 'flow-contact':
-      ui.flow.toContactID = ds.id;
-      hapticTap('tap');
-      render();
       break;
     case 'flow-account':
       ui.flow.toAccountID = ds.id;
@@ -1509,17 +1495,6 @@ function handleAction(action, ds) {
     case 'contribute-submit':
       contributeSubmit();
       break;
-    case 'vc-limit-chip':
-      ui.modal.data.limit = ds.value;
-      hapticTap('tap');
-      render();
-      break;
-    case 'vc-create':
-      vcCreate();
-      break;
-    case 'vc-charge':
-      vcCharge();
-      break;
     case 'budget-save':
       budgetSave();
       break;
@@ -1544,10 +1519,11 @@ function handleAction(action, ds) {
       exportDownload();
       break;
     case 'reset-do':
+      clearSyncAuth();
       ui.modal = null;
-      store.resetDemoData();
+      store.resetAllData();
       hapticTap('freeze');
-      showToast('Demo data reset');
+      showToast('All data erased');
       break;
     case 'sign-out':
       ui.signedInName = '';
@@ -1577,6 +1553,43 @@ function handleAction(action, ds) {
     case 'copy-install-link':
       copyInstallLink();
       break;
+    case 'tx-type':
+      ui.modal.data.type = ds.value;
+      hapticTap('tap');
+      render();
+      break;
+    case 'add-tx-save':
+      addTxSave();
+      break;
+    case 'tx-delete':
+      txDelete();
+      break;
+    case 'account-save':
+      accountSave();
+      break;
+    case 'account-delete':
+      accountDelete();
+      break;
+    case 'sync-mode':
+      ui.sync.mode = ds.value;
+      hapticTap('tap');
+      render();
+      break;
+    case 'sync-auth':
+      syncAuthSubmit(ds.mode);
+      break;
+    case 'sync-push':
+      syncPush().then(function (ok) { if (ok) { hapticTap('success'); showToast('Backed up to cloud'); if (ui.signedInName) render(); } });
+      break;
+    case 'sync-pull':
+      syncPull().then(function (ok) { if (ok && ui.signedInName) render(); });
+      break;
+    case 'sync-signout':
+      clearSyncAuth();
+      hapticTap('tap');
+      showToast('Signed out of cloud');
+      render();
+      break;
     default:
       break;
   }
@@ -1589,11 +1602,7 @@ function setInputValue(key, value) {
     case 'signin-password': ui.signin.password = value; break;
     case 'signin-confirm': ui.signin.confirm = value; break;
     case 'all-search': ui.allSearch = value; renderFocusAware(); break;
-    case 'flow-newname': ui.flow.newName = value; break;
-    case 'flow-newhandle': ui.flow.newHandle = value; break;
     case 'flow-note': ui.flow.note = value; break;
-    case 'flow-question': ui.flow.question = value; break;
-    case 'flow-answer': ui.flow.answer = value; break;
     case 'tx-merchant': ui.modal.data.merchant = value; break;
     case 'schedule-payee-name': ui.modal.data.newPayee = value; break;
     case 'schedule-amount': ui.modal.data.amount = value; break;
@@ -1601,15 +1610,31 @@ function setInputValue(key, value) {
     case 'goal-name': ui.modal.data.name = value; break;
     case 'goal-target': ui.modal.data.target = value; break;
     case 'contribute-amount': ui.modal.data.amount = value; break;
-    case 'vc-limit': ui.modal.data.limit = value; break;
-    case 'spend-amount': ui.modal.data.amount = value; break;
     case 'budget-amount': ui.modal.data.amount = value; break;
+    case 'tx-amount': ui.modal.data.amount = value; break;
+    case 'tx-date': ui.modal.data.date = value; break;
+    case 'account-name': ui.modal.data.name = value; break;
+    case 'account-number': ui.modal.data.number = value; break;
+    case 'account-opening': ui.modal.data.openingBalance = value; break;
+    case 'sync-api-url': localStorage.setItem('sync-api', value); break;
+    case 'sync-email': ui.sync.email = value; break;
+    case 'sync-password': ui.sync.password = value; break;
+    case 'sync-name': ui.sync.name = value; break;
     default: break;
   }
 }
 
 function handleChange(key, el) {
   switch (key) {
+    case 'tx-account':
+      ui.modal.data.accountId = el.value;
+      break;
+    case 'account-kind':
+      ui.modal.data.kind = el.value;
+      break;
+    case 'account-iscard':
+      ui.modal.data.isCard = el.checked;
+      break;
     case 'account-setting': {
       const account = store.accountById(el.dataset.account);
       if (account) {
@@ -1640,23 +1665,8 @@ function handleChange(key, el) {
       ui.modal.data.repeat = el.value;
       renderFocusAware();
       break;
-    case 'vc-source':
-      ui.modal.data.sourceID = el.value;
-      break;
     case 'pref-hide-balances':
       store.hideBalances = el.checked;
-      store.commit();
-      break;
-    case 'pref-roundup':
-      store.roundUpEnabled = el.checked;
-      if (store.roundUpEnabled && !store.roundUpGoalID && store.goals.length) {
-        store.roundUpGoalID = store.goals[0].id;
-      }
-      store.commit();
-      hapticTap('tap');
-      break;
-    case 'pref-roundup-goal':
-      store.roundUpGoalID = el.value;
       store.commit();
       break;
     default:
@@ -1695,6 +1705,9 @@ function installApp() {
 }
 
 function appURL() {
+  if (window.location.protocol !== 'https:') {
+    return 'https://yetties-bank.pages.dev';
+  }
   return window.location.href.split('#')[0];
 }
 
@@ -1741,10 +1754,154 @@ function fallbackCopy(text) {
   input.remove();
 }
 
+/* ---------- Cloud sync (Phase 1 backend) ---------- */
+
+const SYNC_KEYS = { token: 'sync-token', user: 'sync-user', apiUrl: 'sync-api', lastBackup: 'sync-last-backup' };
+
+function syncToken() { return localStorage.getItem(SYNC_KEYS.token) || ''; }
+
+function syncUser() {
+  try { return JSON.parse(localStorage.getItem(SYNC_KEYS.user)); }
+  catch (e) { return null; }
+}
+
+function syncApiBase() {
+  return (localStorage.getItem(SYNC_KEYS.apiUrl) || '').trim().replace(/\/+$/, '');
+}
+
+function syncSignedIn() { return !!syncToken() && !!syncUser(); }
+
+function setSyncAuth(token, user) {
+  localStorage.setItem(SYNC_KEYS.token, token);
+  localStorage.setItem(SYNC_KEYS.user, JSON.stringify(user));
+}
+
+function clearSyncAuth() {
+  localStorage.removeItem(SYNC_KEYS.token);
+  localStorage.removeItem(SYNC_KEYS.user);
+  localStorage.removeItem(SYNC_KEYS.lastBackup);
+}
+
+function lastBackupLabel() {
+  const t = Number(localStorage.getItem(SYNC_KEYS.lastBackup));
+  if (!t) return null;
+  return 'Last backup ' + relativeLabel(t);
+}
+
+function snapshotPayload() {
+  return {
+    accounts: store.accounts,
+    transactions: store.transactions,
+    goals: store.goals,
+    bills: store.bills,
+    recurringTransfers: store.recurringTransfers,
+    hideBalances: store.hideBalances,
+    monthlyBudget: ui.monthlyBudget
+  };
+}
+
+let syncBusy = false;
+
+async function syncPush() {
+  if (!syncSignedIn() || syncBusy) return false;
+  const api = syncApiBase();
+  if (!api) { showToast('Add your sync server URL in Profile first.', 'error'); hapticTap('error'); return false; }
+  syncBusy = true;
+  try {
+    const res = await fetch(api + '/api/data', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + syncToken() },
+      body: JSON.stringify(snapshotPayload())
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Backup failed.', 'error'); hapticTap('error'); return false; }
+    localStorage.setItem(SYNC_KEYS.lastBackup, String(Date.now()));
+    return true;
+  } catch (e) {
+    showToast('Couldn\'t reach the sync server.', 'error');
+    hapticTap('error');
+    return false;
+  } finally {
+    syncBusy = false;
+  }
+}
+
+async function syncPull() {
+  if (!syncSignedIn() || syncBusy) return false;
+  const api = syncApiBase();
+  if (!api) { showToast('Add your sync server URL in Profile first.', 'error'); hapticTap('error'); return false; }
+  syncBusy = true;
+  try {
+    const res = await fetch(api + '/api/data', { headers: { 'Authorization': 'Bearer ' + syncToken() } });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Restore failed.', 'error'); hapticTap('error'); return false; }
+    if (!data.data) { showToast('Nothing backed up yet.'); return false; }
+    const s = data.data;
+    store.accounts = Array.isArray(s.accounts) ? s.accounts : [];
+    store.transactions = Array.isArray(s.transactions) ? s.transactions : [];
+    store.goals = Array.isArray(s.goals) ? s.goals : [];
+    store.bills = Array.isArray(s.bills) ? s.bills : [];
+    store.recurringTransfers = Array.isArray(s.recurringTransfers) ? s.recurringTransfers : [];
+    store.hideBalances = !!s.hideBalances;
+    if (typeof s.monthlyBudget === 'number') {
+      ui.monthlyBudget = s.monthlyBudget;
+      localStorage.setItem('monthlyBudget', String(ui.monthlyBudget));
+    }
+    store.persist();
+    store.emit();
+    hapticTap('success');
+    showToast('Restored from cloud');
+    return true;
+  } catch (e) {
+    showToast('Couldn\'t reach the sync server.', 'error');
+    return false;
+  } finally {
+    syncBusy = false;
+  }
+}
+
+let syncPushTimer = null;
+function scheduleSyncPush() {
+  if (!syncSignedIn()) return;
+  if (syncPushTimer) clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(async function () { await syncPush(); }, 2000);
+}
+
+async function syncAuthSubmit(mode) {
+  const d = ui.sync;
+  const email = (d.email || '').trim();
+  const password = d.password || '';
+  if (!email.includes('@') || !email.includes('.')) { showToast('Please enter a valid email address.', 'error'); hapticTap('error'); return; }
+  if (password.length < 6) { showToast('Password must be at least 6 characters.', 'error'); hapticTap('error'); return; }
+  const api = syncApiBase();
+  if (!api) { showToast('Enter the sync server URL first.', 'error'); hapticTap('error'); return; }
+  const payload = mode === 'signup'
+    ? { email: email, password: password, name: d.name || '' }
+    : { email: email, password: password };
+  try {
+    const res = await fetch(api + (mode === 'signup' ? '/api/signup' : '/api/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Sign in failed.', 'error'); hapticTap('error'); return; }
+    setSyncAuth(data.token, data.user);
+    d.password = '';
+    hapticTap('success');
+    showToast('Cloud sync ready — backups are automatic now');
+    render();
+    scheduleSyncPush();
+  } catch (e) {
+    showToast('Couldn\'t reach the sync server.', 'error');
+    hapticTap('error');
+  }
+}
+
 /* ---------- Init ---------- */
 
 store.load();
-store.onChange(function () { render(); });
+store.onChange(function () { render(); scheduleSyncPush(); });
 render();
 
 if ('serviceWorker' in navigator && window.isSecureContext) {

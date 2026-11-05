@@ -60,9 +60,6 @@ function categoryStyle(category) {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function hoursAgo(h) { return Date.now() - h * 60 * 60 * 1000; }
-function daysAgo(n, hours) { return Date.now() - (n * 24 + (hours || 0)) * 60 * 60 * 1000; }
-
 function startOfDay(ms) { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
 
 function dayLabel(ms) {
@@ -125,7 +122,7 @@ function formatCardNumber(cardNumber) {
 
 /* ---------- Store ---------- */
 
-const STORAGE_KEY = 'bank.state.v1';
+const STORAGE_KEY = 'bank.state.v2';
 
 const store = {
   accounts: [],
@@ -135,10 +132,7 @@ const store = {
   bills: [],
   recurringTransfers: [],
   notifications: [],
-  virtualCards: [],
   hideBalances: false,
-  roundUpEnabled: false,
-  roundUpGoalID: null,
   _listeners: [],
 
   onChange(fn) { this._listeners.push(fn); },
@@ -156,19 +150,17 @@ const store = {
       this.accounts = state.accounts;
       this.transactions = state.transactions || [];
       this.contacts = state.contacts || [];
-      this.goals = state.goals || this.seedGoals();
-      this.bills = state.bills || this.seedBills();
+      this.goals = state.goals || [];
+      this.bills = state.bills || [];
       this.recurringTransfers = state.recurringTransfers || [];
-      this.notifications = state.notifications || this.seedNotifications();
-      this.virtualCards = state.virtualCards || [];
+      this.notifications = state.notifications || [];
       this.hideBalances = !!state.hideBalances;
-      this.roundUpEnabled = !!state.roundUpEnabled;
-      this.roundUpGoalID = state.roundUpGoalID || null;
       this.processDueBills();
       this.processDueRecurringTransfers();
     } else {
       this.seed();
     }
+    try { localStorage.removeItem('bank.state.v1'); } catch (e) { /* old demo data cleanup */ }
   },
 
   /* ----- lookups & derived ----- */
@@ -177,7 +169,17 @@ const store = {
   contactById(id) { return this.contacts.find(c => c.id === id) || null; },
   goalById(id) { return this.goals.find(g => g.id === id) || null; },
 
-  totalBalance() { return this.accounts.reduce((sum, a) => sum + a.balance, 0); },
+  balanceOf(account) {
+    if (!account) return 0;
+    const opening = typeof account.openingBalance === 'number' ? account.openingBalance : account.balance;
+    let sum = opening;
+    for (const tx of this.transactions) {
+      if (tx.accountId === account.id) sum += tx.amount;
+    }
+    return sum;
+  },
+
+  totalBalance() { return this.accounts.reduce((sum, a) => sum + this.balanceOf(a), 0); },
 
   transactionsFor(accountID) {
     const list = accountID
@@ -199,13 +201,86 @@ const store = {
 
   /* ----- transactions ----- */
 
-  updateTransaction(id, merchant, category) {
+  updateTransaction(id, merchant, category, amount) {
     const tx = this.transactions.find(t => t.id === id);
     if (!tx) return;
     const trimmed = merchant.trim();
     if (!trimmed) return;
     tx.merchant = trimmed;
     tx.category = category;
+    if (typeof amount === 'number' && amount !== 0) tx.amount = amount;
+    this.commit();
+  },
+
+  /* ----- accounts ----- */
+
+  addAccount(data) {
+    const palette = ['1C2540', '0E6B4F', '35507B', '802536', '4EA58B', '8E6FD8', 'D08A3E', 'D96A7B'];
+    const account = {
+      id: uid(),
+      name: (data.name || '').trim() || 'Account',
+      kind: data.kind || 'Checking',
+      number: data.number || '',
+      openingBalance: parseFloat(data.openingBalance) || 0,
+      balance: parseFloat(data.openingBalance) || 0,
+      colorHex: data.colorHex || palette[this.accounts.length % palette.length],
+      isCard: !!data.isCard,
+      cardNumber: data.cardNumber || '',
+      expiry: data.expiry || '',
+      isFrozen: false,
+      contactless: !!data.contactless,
+      onlinePayments: !!data.onlinePayments,
+      atmWithdrawals: !!data.atmWithdrawals
+    };
+    this.accounts.push(account);
+    this.commit();
+    return account;
+  },
+
+  updateAccount(id, patch) {
+    const account = this.accountById(id);
+    if (!account) return;
+    if (typeof patch.name === 'string' && patch.name.trim()) account.name = patch.name.trim();
+    if (patch.kind) account.kind = patch.kind;
+    if (typeof patch.number === 'string') account.number = patch.number;
+    if (typeof patch.openingBalance === 'number') {
+      account.openingBalance = patch.openingBalance;
+      account.balance = patch.openingBalance;
+    }
+    if (typeof patch.isCard === 'boolean') account.isCard = patch.isCard;
+    if (typeof patch.cardNumber === 'string') account.cardNumber = patch.cardNumber;
+    if (typeof patch.expiry === 'string') account.expiry = patch.expiry;
+    this.commit();
+  },
+
+  deleteAccount(id) {
+    this.accounts = this.accounts.filter(a => a.id !== id);
+    this.transactions = this.transactions.filter(t => t.accountId !== id);
+    this.bills = this.bills.filter(b => b.accountId !== id);
+    this.commit();
+  },
+
+  /* ----- transactions ----- */
+
+  addTransaction(data) {
+    const account = this.accountById(data.accountId);
+    if (!account) return;
+    const amount = parseFloat(data.amount);
+    if (!(amount > 0)) return;
+    const signed = data.type === 'income' ? amount : -amount;
+    this.transactions.unshift({
+      id: uid(),
+      accountId: data.accountId,
+      merchant: (data.merchant || '').trim() || 'Untitled',
+      category: data.category || 'Uncategorised',
+      amount: signed,
+      date: data.date || Date.now()
+    });
+    this.commit();
+  },
+
+  deleteTransaction(id) {
+    this.transactions = this.transactions.filter(t => t.id !== id);
     this.commit();
   },
 
@@ -231,48 +306,18 @@ const store = {
 
     const contact = toContactID ? this.contactById(toContactID) : null;
     if (contact) {
-      from.balance -= amount;
       this.transactions.unshift({ id: uid(), accountId: fromID, merchant: contact.name,
         category: 'Transfers', amount: -amount, date: now });
       this.addNotification('Transfer sent', currencyString(amount) + ' to ' + contact.name, '📤', '4C8DF5');
-      this.applyRoundUp(fromID, amount, now);
     } else if (toAccountID) {
       const to = this.accountById(toAccountID);
-      if (!to) return;
-      from.balance -= amount;
-      to.balance += amount;
+      if (!to || to.id === from.id) return;
       this.transactions.unshift({ id: uid(), accountId: fromID, merchant: 'To ' + to.name,
         category: 'Internal transfer', amount: -amount, date: now });
       this.transactions.unshift({ id: uid(), accountId: to.id, merchant: 'From ' + from.name,
         category: 'Internal transfer', amount: amount, date: now });
       this.addNotification('Transfer completed', currencyString(amount) + ' moved to ' + to.name, '🔁', '4C8DF5');
     }
-    this.commit();
-  },
-
-  sendETransfer(fromID, recipientName, handle, amount) {
-    if (!(amount > 0)) return;
-    const from = this.accountById(fromID);
-    if (!from || from.balance < amount) return;
-    const name = (recipientName || '').trim();
-    const trimmedHandle = (handle || '').trim();
-    if (!name || !trimmedHandle) return;
-
-    from.balance -= amount;
-    this.transactions.unshift({ id: uid(), accountId: fromID, merchant: name,
-      category: 'Transfers', amount: -amount, date: Date.now() });
-
-    const exists = this.contacts.some(c => c.handle.toLowerCase() === trimmedHandle.toLowerCase());
-    if (!exists) {
-      const palette = ['D96A7B', '5B7BD5', 'D08A3E', '4EA58B', '8E6FD8', 'F2762E'];
-      let hash = 0;
-      for (const ch of name) hash = (hash + ch.charCodeAt(0)) % 100000;
-      this.contacts.push({ id: uid(), name: name, handle: trimmedHandle, colorHex: palette[hash % palette.length] });
-    }
-
-    this.addNotification('E-transfer sent',
-      currencyString(amount) + ' to ' + name + ' · ' + trimmedHandle, '✈️', '4C8DF5');
-    this.applyRoundUp(fromID, amount, Date.now());
     this.commit();
   },
 
@@ -287,8 +332,7 @@ const store = {
     if (!(amount > 0)) return;
     const goal = this.goalById(goalID);
     const account = this.accountById(accountID);
-    if (!goal || !account || account.balance < amount) return;
-    account.balance -= amount;
+    if (!goal || !account || this.balanceOf(account) < amount) return;
     goal.saved += amount;
     this.transactions.unshift({ id: uid(), accountId: accountID,
       merchant: 'Saving for ' + goal.name, category: 'Internal transfer',
@@ -296,64 +340,6 @@ const store = {
     this.addNotification('Goal contribution',
       currencyString(amount) + ' added to ' + goal.name, '🎯', goal.colorHex);
     this.commit();
-  },
-
-  applyRoundUp(sourceAccountID, purchaseAmount, date) {
-    if (!this.roundUpEnabled || !(purchaseAmount > 0) || !this.roundUpGoalID) return;
-    const goal = this.goalById(this.roundUpGoalID);
-    const account = this.accountById(sourceAccountID);
-    if (!goal || !account || !account.isCard) return;
-    const difference = Math.ceil(purchaseAmount) - purchaseAmount;
-    if (difference < 0.01) return;
-    account.balance -= difference;
-    goal.saved += difference;
-    this.transactions.unshift({ id: uid(), accountId: sourceAccountID,
-      merchant: 'Round up — ' + goal.name, category: 'Round up',
-      amount: -difference, date: date || Date.now() });
-    this.persist();
-  },
-
-  /* ----- virtual cards ----- */
-
-  addVirtualCard(sourceAccountID, limit) {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 3);
-    const expiry = String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear() % 100).padStart(2, '0');
-    let digits = '4';
-    for (let i = 1; i < 16; i++) digits += Math.floor(Math.random() * 10);
-    const card = { id: uid(), sourceAccountID: sourceAccountID, cardNumber: digits, expiry: expiry,
-      cvc: String(100 + Math.floor(Math.random() * 900)), limit: limit, spent: 0,
-      isFrozen: false, createdAt: Date.now() };
-    this.virtualCards.unshift(card);
-    this.commit();
-    return card;
-  },
-
-  toggleVirtualCardFreeze(id) {
-    const card = this.virtualCards.find(c => c.id === id);
-    if (!card) return;
-    card.isFrozen = !card.isFrozen;
-    this.addNotification(card.isFrozen ? 'Virtual card frozen' : 'Virtual card unfrozen',
-      '•••• ' + card.cardNumber.slice(-4), '❄️', '4C8DF5');
-    this.commit();
-  },
-
-  spendOnVirtualCard(id, amount) {
-    if (!(amount > 0)) return false;
-    const card = this.virtualCards.find(c => c.id === id);
-    if (!card) return false;
-    const account = this.accountById(card.sourceAccountID);
-    if (!account) return false;
-    if (card.isFrozen) return false;
-    if (card.limit - card.spent < amount - 0.001) return false;
-    card.spent += amount;
-    account.balance -= amount;
-    this.transactions.unshift({ id: uid(), accountId: account.id,
-      merchant: 'Online purchase', category: 'Virtual card', amount: -amount, date: Date.now() });
-    this.addNotification('Virtual card purchase',
-      currencyString(amount) + ' · •••• ' + card.cardNumber.slice(-4), '✨', '0E7C5A');
-    this.commit();
-    return true;
   },
 
   /* ----- bills ----- */
@@ -374,15 +360,10 @@ const store = {
     const now = Date.now();
     let changed = false;
     for (const bill of this.bills) {
-      const account = this.accountById(bill.accountId);
-      if (!account) continue;
+      if (!this.accountById(bill.accountId)) continue;
       let guard = 0;
       while (bill.nextDue <= now && guard < 60) {
-        account.balance -= bill.amount;
-        this.transactions.unshift({ id: uid(), accountId: bill.accountId,
-          merchant: bill.payee, category: 'Bills', amount: -bill.amount, date: bill.nextDue });
-        this.addNotification('Bill paid', currencyString(bill.amount) + ' to ' + bill.payee, '🧾', '4C8DF5');
-        this.applyRoundUp(bill.accountId, bill.amount, bill.nextDue);
+        this.addNotification('Bill due', currencyString(bill.amount) + ' to ' + bill.payee, '🧾', '4C8DF5');
         bill.nextDue = nextDueAfter(bill.nextDue, bill.frequency);
         guard++;
         changed = true;
@@ -419,12 +400,8 @@ const store = {
       let guard = 0;
       while (recurring.nextDue <= now && guard < 60) {
         const due = recurring.nextDue;
-        if (recurring.kind === 'transfer') {
-          this.performTransfer(recurring.fromAccountID, recurring.toContactID,
-            recurring.toAccountID, recurring.amount);
-        } else if (recurring.goalID) {
-          this.contribute(recurring.goalID, recurring.fromAccountID, recurring.amount);
-        }
+        this.addNotification('Scheduled', recurring.title + ' · ' + currencyString(recurring.amount),
+          recurring.kind === 'goal' ? '🎯' : '🔁', '4C8DF5');
         recurring.nextDue = nextDueAfter(due, recurring.frequency);
         guard++;
         changed = true;
@@ -467,7 +444,7 @@ const store = {
     return rows.join('\n');
   },
 
-  resetDemoData() {
+  resetAllData() {
     this.seed();
     this.emit();
   },
@@ -478,96 +455,22 @@ const store = {
     const state = {
       accounts: this.accounts, transactions: this.transactions, contacts: this.contacts,
       goals: this.goals, bills: this.bills, recurringTransfers: this.recurringTransfers,
-      notifications: this.notifications, virtualCards: this.virtualCards,
-      hideBalances: this.hideBalances, roundUpEnabled: this.roundUpEnabled,
-      roundUpGoalID: this.roundUpGoalID
+      notifications: this.notifications,
+      hideBalances: this.hideBalances
     };
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* storage full */ }
   },
 
   seed() {
-    const checkingID = uid(), savingsID = uid(), travelID = uid(), creditID = uid();
-    this.accounts = [
-      { id: checkingID, name: 'Everyday', kind: 'Checking', number: '•• 4821', balance: 4820.55,
-        colorHex: '1C2540', isCard: true, cardNumber: '4293881045214821', expiry: '04/29',
-        isFrozen: false, contactless: true, onlinePayments: true, atmWithdrawals: true },
-      { id: savingsID, name: 'High-Yield Savings', kind: 'Savings', number: '•• 9034', balance: 12300.00,
-        colorHex: '0E6B4F', isCard: false, cardNumber: '', expiry: '',
-        isFrozen: false, contactless: false, onlinePayments: true, atmWithdrawals: false },
-      { id: travelID, name: 'Travel', kind: 'Prepaid card', number: '•• 7712', balance: 340.20,
-        colorHex: '35507B', isCard: true, cardNumber: '5412751234567712', expiry: '09/28',
-        isFrozen: false, contactless: true, onlinePayments: true, atmWithdrawals: true },
-      { id: creditID, name: 'Mastercard Credit', kind: 'Credit card', number: '•• 2841', balance: 1250.00,
-        colorHex: '802536', isCard: true, cardNumber: '5191286745092841', expiry: '07/29',
-        isFrozen: false, contactless: true, onlinePayments: true, atmWithdrawals: true }
-    ];
-
-    this.contacts = [
-      { id: uid(), name: 'Maya Chen', handle: '@maya', colorHex: 'D96A7B' },
-      { id: uid(), name: 'Dev Patel', handle: '@devp', colorHex: '5B7BD5' },
-      { id: uid(), name: 'Sofia Rossi', handle: '@sofia', colorHex: 'D08A3E' },
-      { id: uid(), name: 'Jonah Blake', handle: '@jonah', colorHex: '4EA58B' }
-    ];
-
-    this.transactions = [
-      { id: uid(), accountId: checkingID, merchant: 'Blue Bottle Coffee', category: 'Food & drink', amount: -4.80, date: daysAgo(0, 2) },
-      { id: uid(), accountId: checkingID, merchant: 'Uber', category: 'Transport', amount: -18.40, date: daysAgo(1, 4) },
-      { id: uid(), accountId: travelID, merchant: 'Airbnb', category: 'Travel', amount: -212.00, date: daysAgo(2, 1) },
-      { id: uid(), accountId: checkingID, merchant: 'Salary — Meridian Labs', category: 'Income', amount: 3450.00, date: daysAgo(3, 6) },
-      { id: uid(), accountId: checkingID, merchant: 'Whole Foods Market', category: 'Groceries', amount: -86.25, date: daysAgo(3, 9) },
-      { id: uid(), accountId: travelID, merchant: 'Metro Card Top-up', category: 'Transport', amount: -30.00, date: daysAgo(4, 3) },
-      { id: uid(), accountId: checkingID, merchant: 'Spotify', category: 'Subscriptions', amount: -10.99, date: daysAgo(4, 7) },
-      { id: uid(), accountId: savingsID, merchant: 'Monthly transfer in', category: 'Internal transfer', amount: 500.00, date: daysAgo(5, 2) },
-      { id: uid(), accountId: travelID, merchant: 'Café de Paris', category: 'Food & drink', amount: -14.60, date: daysAgo(5, 5) },
-      { id: uid(), accountId: travelID, merchant: 'Refund — Booking.com', category: 'Refund', amount: 45.00, date: daysAgo(6, 2) },
-      { id: uid(), accountId: checkingID, merchant: 'Apple Store', category: 'Electronics', amount: -249.00, date: daysAgo(6, 8) },
-      { id: uid(), accountId: checkingID, merchant: 'ATM Withdrawal', category: 'Cash', amount: -100.00, date: daysAgo(7, 3) },
-      { id: uid(), accountId: savingsID, merchant: 'Interest', category: 'Income', amount: 21.40, date: daysAgo(8, 1) }
-    ];
-
-    this.goals = this.seedGoals();
-    this.bills = this.seedBills();
-    this.notifications = this.seedNotifications();
-    this.virtualCards = [];
+    this.accounts = [];
+    this.transactions = [];
+    this.contacts = [];
+    this.goals = [];
+    this.bills = [];
+    this.recurringTransfers = [];
+    this.notifications = [];
     this.hideBalances = false;
-    this.roundUpEnabled = false;
-    this.roundUpGoalID = null;
     this.persist();
-  },
-
-  seedGoals() {
-    return [
-      { id: uid(), name: 'Japan trip', emoji: '✈️', colorHex: '3BB273', target: 5000, saved: 2150 },
-      { id: uid(), name: 'New laptop', emoji: '💻', colorHex: 'F2762E', target: 1500, saved: 1000 },
-      { id: uid(), name: 'Emergency fund', emoji: '🚨', colorHex: '4C8DF5', target: 2000, saved: 500 },
-      { id: uid(), name: 'Home deposit', emoji: '🏠', colorHex: '8E6FD8', target: 2500, saved: 2000 },
-      { id: uid(), name: 'New phone', emoji: '📱', colorHex: '1FA97C', target: 700, saved: 700 }
-    ];
-  },
-
-  seedBills() {
-    const checkingID = this.accounts[0].id;
-    return [
-      { id: uid(), payee: 'Riverside Apartments', amount: 1650.00, accountId: checkingID,
-        frequency: 'Monthly', nextDue: Date.now() + 2 * DAY_MS },
-      { id: uid(), payee: 'Spotify Premium', amount: 10.99, accountId: checkingID,
-        frequency: 'Monthly', nextDue: Date.now() + 5 * DAY_MS },
-      { id: uid(), payee: 'City Gym', amount: 12.50, accountId: checkingID,
-        frequency: 'Weekly', nextDue: Date.now() + 3 * DAY_MS }
-    ];
-  },
-
-  seedNotifications() {
-    return [
-      { id: uid(), title: 'Salary deposited', message: '+ $3,450.00 from Meridian Labs',
-        icon: '💰', colorHex: '0E7C5A', date: hoursAgo(20), isRead: false },
-      { id: uid(), title: 'Transfer completed', message: '$30.00 moved to Travel',
-        icon: '🔁', colorHex: '4C8DF5', date: hoursAgo(52), isRead: true },
-      { id: uid(), title: 'Refund received', message: '$45.00 from Booking.com',
-        icon: '↩️', colorHex: '0E7C5A', date: hoursAgo(70), isRead: true },
-      { id: uid(), title: 'Card frozen', message: 'Everyday · •••• 4821',
-        icon: '❄️', colorHex: '4C8DF5', date: hoursAgo(96), isRead: true }
-    ];
   }
 };
 

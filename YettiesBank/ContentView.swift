@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  MobileBank
+//  YettiesBank
 //
 //  Created by Neel Makhecha on 9/5/25.
 //

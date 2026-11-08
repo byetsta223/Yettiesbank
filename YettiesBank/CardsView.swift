@@ -1,6 +1,6 @@
 //
 //  CardsView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

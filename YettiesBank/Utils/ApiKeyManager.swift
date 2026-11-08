@@ -1,6 +1,6 @@
 //
 //  ApiKeyManager.swift
-//  MobileBank
+//  YettiesBank
 //
 //  Secure storage for API keys using Keychain Services
 //
@@ -38,9 +38,9 @@ class ApiKeyManager {
         if let bundleId = Bundle.main.bundleIdentifier {
             // Extract project name from bundle ID (e.g., "com.example.MyApp" -> "MyApp")
             let components = bundleId.components(separatedBy: ".")
-            return components.last ?? "MobileBank"
+            return components.last ?? "YettiesBank"
         }
-        return "MobileBank"
+        return "YettiesBank"
     }
     
     // MARK: - Public Methods

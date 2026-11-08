@@ -1,6 +1,6 @@
 //
 //  GoalsView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

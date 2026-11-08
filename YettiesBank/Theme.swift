@@ -1,6 +1,6 @@
 //
 //  Theme.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

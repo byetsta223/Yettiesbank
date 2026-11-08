@@ -1,6 +1,6 @@
 //
 //  Models.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import Foundation

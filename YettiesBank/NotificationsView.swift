@@ -1,6 +1,6 @@
 //
 //  NotificationsView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

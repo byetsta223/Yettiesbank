@@ -1,6 +1,6 @@
 //
 //  TransactionEditSheet.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

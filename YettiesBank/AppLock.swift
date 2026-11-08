@@ -1,6 +1,6 @@
 //
 //  AppLock.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

@@ -1,6 +1,6 @@
 //
 //  BillsView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

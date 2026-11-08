@@ -12,22 +12,22 @@
 			containerPortal = 184F59042E6ACF1E00FBE038 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 184F590B2E6ACF1E00FBE038;
-			remoteInfo = MobileBank;
+			remoteInfo = YettiesBank;
 		};
 		184F59242E6ACF2000FBE038 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 184F59042E6ACF1E00FBE038 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 184F590B2E6ACF1E00FBE038;
-			remoteInfo = MobileBank;
+			remoteInfo = YettiesBank;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		184F590C2E6ACF1E00FBE038 /* MobileBank.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MobileBank.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		184F59192E6ACF2000FBE038 /* MobileBankTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MobileBankTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		184F59232E6ACF2000FBE038 /* MobileBankUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MobileBankUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		8EF1228EB10E9BD2C838A954 /* MobileBank.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = MobileBank.entitlements; path = MobileBank/MobileBank.entitlements; sourceTree = "<group>"; };
+		184F590C2E6ACF1E00FBE038 /* YettiesBank.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = YettiesBank.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		184F59192E6ACF2000FBE038 /* YettiesBankTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YettiesBankTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		184F59232E6ACF2000FBE038 /* YettiesBankUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = YettiesBankUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		8EF1228EB10E9BD2C838A954 /* YettiesBank.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; name = YettiesBank.entitlements; path = YettiesBank/YettiesBank.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -36,27 +36,27 @@
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 184F590B2E6ACF1E00FBE038 /* MobileBank */;
+			target = 184F590B2E6ACF1E00FBE038 /* YettiesBank */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		184F590E2E6ACF1E00FBE038 /* MobileBank */ = {
+		184F590E2E6ACF1E00FBE038 /* YettiesBank */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				187AF0F92E828D1000505E98 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
 			);
-			path = MobileBank;
+			path = YettiesBank;
 			sourceTree = "<group>";
 		};
-		184F591C2E6ACF2000FBE038 /* MobileBankTests */ = {
+		184F591C2E6ACF2000FBE038 /* YettiesBankTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MobileBankTests;
+			path = YettiesBankTests;
 			sourceTree = "<group>";
 		};
-		184F59262E6ACF2000FBE038 /* MobileBankUITests */ = {
+		184F59262E6ACF2000FBE038 /* YettiesBankUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = MobileBankUITests;
+			path = YettiesBankUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -89,20 +89,20 @@
 		184F59032E6ACF1E00FBE038 = {
 			isa = PBXGroup;
 			children = (
-				184F590E2E6ACF1E00FBE038 /* MobileBank */,
-				184F591C2E6ACF2000FBE038 /* MobileBankTests */,
-				184F59262E6ACF2000FBE038 /* MobileBankUITests */,
+				184F590E2E6ACF1E00FBE038 /* YettiesBank */,
+				184F591C2E6ACF2000FBE038 /* YettiesBankTests */,
+				184F59262E6ACF2000FBE038 /* YettiesBankUITests */,
 				184F590D2E6ACF1E00FBE038 /* Products */,
-				8EF1228EB10E9BD2C838A954 /* MobileBank.entitlements */,
+				8EF1228EB10E9BD2C838A954 /* YettiesBank.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
 		184F590D2E6ACF1E00FBE038 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				184F590C2E6ACF1E00FBE038 /* MobileBank.app */,
-				184F59192E6ACF2000FBE038 /* MobileBankTests.xctest */,
-				184F59232E6ACF2000FBE038 /* MobileBankUITests.xctest */,
+				184F590C2E6ACF1E00FBE038 /* YettiesBank.app */,
+				184F59192E6ACF2000FBE038 /* YettiesBankTests.xctest */,
+				184F59232E6ACF2000FBE038 /* YettiesBankUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -110,9 +110,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		184F590B2E6ACF1E00FBE038 /* MobileBank */ = {
+		184F590B2E6ACF1E00FBE038 /* YettiesBank */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 184F592D2E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBank" */;
+			buildConfigurationList = 184F592D2E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBank" */;
 			buildPhases = (
 				184F59082E6ACF1E00FBE038 /* Sources */,
 				184F59092E6ACF1E00FBE038 /* Frameworks */,
@@ -123,18 +123,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				184F590E2E6ACF1E00FBE038 /* MobileBank */,
+				184F590E2E6ACF1E00FBE038 /* YettiesBank */,
 			);
-			name = MobileBank;
+			name = YettiesBank;
 			packageProductDependencies = (
 			);
-			productName = MobileBank;
-			productReference = 184F590C2E6ACF1E00FBE038 /* MobileBank.app */;
+			productName = YettiesBank;
+			productReference = 184F590C2E6ACF1E00FBE038 /* YettiesBank.app */;
 			productType = "com.apple.product-type.application";
 		};
-		184F59182E6ACF2000FBE038 /* MobileBankTests */ = {
+		184F59182E6ACF2000FBE038 /* YettiesBankTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 184F59302E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBankTests" */;
+			buildConfigurationList = 184F59302E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBankTests" */;
 			buildPhases = (
 				184F59152E6ACF2000FBE038 /* Sources */,
 				184F59162E6ACF2000FBE038 /* Frameworks */,
@@ -146,18 +146,18 @@
 				184F591B2E6ACF2000FBE038 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				184F591C2E6ACF2000FBE038 /* MobileBankTests */,
+				184F591C2E6ACF2000FBE038 /* YettiesBankTests */,
 			);
-			name = MobileBankTests;
+			name = YettiesBankTests;
 			packageProductDependencies = (
 			);
-			productName = MobileBankTests;
-			productReference = 184F59192E6ACF2000FBE038 /* MobileBankTests.xctest */;
+			productName = YettiesBankTests;
+			productReference = 184F59192E6ACF2000FBE038 /* YettiesBankTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		184F59222E6ACF2000FBE038 /* MobileBankUITests */ = {
+		184F59222E6ACF2000FBE038 /* YettiesBankUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 184F59332E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBankUITests" */;
+			buildConfigurationList = 184F59332E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBankUITests" */;
 			buildPhases = (
 				184F591F2E6ACF2000FBE038 /* Sources */,
 				184F59202E6ACF2000FBE038 /* Frameworks */,
@@ -169,13 +169,13 @@
 				184F59252E6ACF2000FBE038 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				184F59262E6ACF2000FBE038 /* MobileBankUITests */,
+				184F59262E6ACF2000FBE038 /* YettiesBankUITests */,
 			);
-			name = MobileBankUITests;
+			name = YettiesBankUITests;
 			packageProductDependencies = (
 			);
-			productName = MobileBankUITests;
-			productReference = 184F59232E6ACF2000FBE038 /* MobileBankUITests.xctest */;
+			productName = YettiesBankUITests;
+			productReference = 184F59232E6ACF2000FBE038 /* YettiesBankUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -201,7 +201,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 184F59072E6ACF1E00FBE038 /* Build configuration list for PBXProject "MobileBank" */;
+			buildConfigurationList = 184F59072E6ACF1E00FBE038 /* Build configuration list for PBXProject "YettiesBank" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -215,9 +215,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				184F590B2E6ACF1E00FBE038 /* MobileBank */,
-				184F59182E6ACF2000FBE038 /* MobileBankTests */,
-				184F59222E6ACF2000FBE038 /* MobileBankUITests */,
+				184F590B2E6ACF1E00FBE038 /* YettiesBank */,
+				184F59182E6ACF2000FBE038 /* YettiesBankTests */,
+				184F59222E6ACF2000FBE038 /* YettiesBankUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -273,12 +273,12 @@
 /* Begin PBXTargetDependency section */
 		184F591B2E6ACF2000FBE038 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 184F590B2E6ACF1E00FBE038 /* MobileBank */;
+			target = 184F590B2E6ACF1E00FBE038 /* YettiesBank */;
 			targetProxy = 184F591A2E6ACF2000FBE038 /* PBXContainerItemProxy */;
 		};
 		184F59252E6ACF2000FBE038 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 184F590B2E6ACF1E00FBE038 /* MobileBank */;
+			target = 184F590B2E6ACF1E00FBE038 /* YettiesBank */;
 			targetProxy = 184F59242E6ACF2000FBE038 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -410,13 +410,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = MobileBank/MobileBank.entitlements;
+				CODE_SIGN_ENTITLEMENTS = YettiesBank/YettiesBank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = MobileBank/Info.plist;
+				INFOPLIST_FILE = YettiesBank/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,7 +428,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBank;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBank;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -445,13 +445,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = MobileBank/MobileBank.entitlements;
+				CODE_SIGN_ENTITLEMENTS = YettiesBank/YettiesBank.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = MobileBank/Info.plist;
+				INFOPLIST_FILE = YettiesBank/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -463,7 +463,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBank;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBank;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -485,12 +485,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBankTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBankTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MobileBank.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MobileBank";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YettiesBank.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YettiesBank";
 			};
 			name = Debug;
 		};
@@ -504,12 +504,12 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBankTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBankTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MobileBank.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/MobileBank";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/YettiesBank.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/YettiesBank";
 			};
 			name = Release;
 		};
@@ -521,12 +521,12 @@
 				DEVELOPMENT_TEAM = HVBAS84WPA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBankUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBankUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = MobileBank;
+				TEST_TARGET_NAME = YettiesBank;
 			};
 			name = Debug;
 		};
@@ -538,19 +538,19 @@
 				DEVELOPMENT_TEAM = HVBAS84WPA;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.MobileBankUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.organizationName.YettiesBankUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = MobileBank;
+				TEST_TARGET_NAME = YettiesBank;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		184F59072E6ACF1E00FBE038 /* Build configuration list for PBXProject "MobileBank" */ = {
+		184F59072E6ACF1E00FBE038 /* Build configuration list for PBXProject "YettiesBank" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				184F592B2E6ACF2000FBE038 /* Debug */,
@@ -559,7 +559,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		184F592D2E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBank" */ = {
+		184F592D2E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBank" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				184F592E2E6ACF2000FBE038 /* Debug */,
@@ -568,7 +568,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		184F59302E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBankTests" */ = {
+		184F59302E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBankTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				184F59312E6ACF2000FBE038 /* Debug */,
@@ -577,7 +577,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		184F59332E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "MobileBankUITests" */ = {
+		184F59332E6ACF2000FBE038 /* Build configuration list for PBXNativeTarget "YettiesBankUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				184F59342E6ACF2000FBE038 /* Debug */,

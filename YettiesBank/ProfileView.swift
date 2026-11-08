@@ -1,6 +1,6 @@
 //
 //  ProfileView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

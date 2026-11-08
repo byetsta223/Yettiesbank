@@ -1,6 +1,6 @@
 //
 //  Components.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

@@ -1,6 +1,6 @@
 //
 //  SignInGate.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

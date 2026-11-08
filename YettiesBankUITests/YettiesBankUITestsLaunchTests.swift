@@ -1,13 +1,13 @@
 //
-//  MobileBankUITestsLaunchTests.swift
-//  MobileBankUITests
+//  YettiesBankUITestsLaunchTests.swift
+//  YettiesBankUITests
 //
 //  Created by Neel Makhecha on 9/5/25.
 //
 
 import XCTest
 
-final class MobileBankUITestsLaunchTests: XCTestCase {
+final class YettiesBankUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

@@ -1,6 +1,6 @@
 //
 //  TransferView.swift
-//  MobileBank
+//  YettiesBank
 //
 
 import SwiftUI

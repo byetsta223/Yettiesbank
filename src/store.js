@@ -49,7 +49,8 @@ const CATEGORY_STYLE = {
   'Round up':          { icon: '⬆️', color: '0E7C5A', bg: 'E2F3EC' },
   'Virtual card':      { icon: '✨', color: '0E7C5A', bg: 'E2F3EC' },
   'Internal transfer': { icon: '🔁', color: '4C8DF5', bg: 'E1E8FA' },
-  'Transfers':         { icon: '📤', color: '4C8DF5', bg: 'E1E8FA' }
+  'Transfers':         { icon: '📤', color: '4C8DF5', bg: 'E1E8FA' },
+  'E-Transfer':        { icon: '💸', color: '3F6BD6', bg: 'E1E8FA' }
 };
 
 function categoryStyle(category) {
@@ -318,6 +319,24 @@ const store = {
         category: 'Internal transfer', amount: amount, date: now });
       this.addNotification('Transfer completed', currencyString(amount) + ' moved to ' + to.name, '🔁', '4C8DF5');
     }
+    this.commit();
+  },
+
+  performETransfer(fromID, recipientName, recipientEmail, amount) {
+    if (!(amount > 0)) return;
+    const from = this.accountById(fromID);
+    if (!from || !recipientName) return;
+    const now = Date.now();
+    this.transactions.unshift({ id: uid(), accountId: fromID,
+      merchant: 'e-Transfer · ' + recipientName,
+      category: 'E-Transfer', amount: -amount, date: now });
+    if (recipientEmail) {
+      const known = this.contacts.some(c => (c.email || '') === recipientEmail);
+      if (!known) this.contacts.push({ id: uid(), name: recipientName, email: recipientEmail });
+    }
+    this.addNotification('E-Transfer sent',
+      currencyString(amount) + ' sent to ' + recipientName +
+      (recipientEmail ? ' (' + recipientEmail + ')' : '') + '.', '💸', '3F6BD6');
     this.commit();
   },
 

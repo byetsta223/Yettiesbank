@@ -200,6 +200,7 @@ function homeHTML() {
   html += '<div class="qa-grid">' +
     '<button class="qa-btn" data-action="open-modal" data-type="add-tx"><span class="qa-icon">➕</span>Add tx</button>' +
     '<button class="qa-btn" data-action="open-flow" data-mode="send"><span class="qa-icon">↔️</span>Move</button>' +
+    '<button class="qa-btn" data-action="open-flow" data-mode="etransfer"><span class="qa-icon">💸</span>e-Transfer</button>' +
     '<button class="qa-btn" data-action="open-page" data-type="goals"><span class="qa-icon">🎯</span>Goals</button>' +
     '<button class="qa-btn" data-action="open-page" data-type="all"><span class="qa-icon">🕒</span>History</button></div>';
 
@@ -310,6 +311,7 @@ function openFlow(mode, context) {
     mode: mode, step: 'amount', amountText: '',
     fromID: store.accounts.length ? store.accounts[0].id : null,
     toAccountID: null, note: '',
+    toContact: null, recipientName: '', recipientEmail: '',
     repeatEnabled: false, repeatFrequency: 'Monthly'
   };
 }
@@ -319,6 +321,7 @@ function resetFlow() {
   if (!f) return;
   f.step = 'amount'; f.amountText = ''; f.note = '';
   f.toAccountID = null;
+  f.toContact = null; f.recipientName = ''; f.recipientEmail = '';
   f.repeatEnabled = false; f.repeatFrequency = 'Monthly';
 }
 
@@ -332,7 +335,27 @@ function flowHTML(embedded) {
 
 function flowHasRecipient() {
   const f = ui.flow;
+  if (f.mode === 'etransfer') {
+    if (f.toContact === -1) {
+      return (f.recipientName || '').trim() !== '' &&
+        (f.recipientEmail || '').indexOf('@') !== -1;
+    }
+    return typeof f.toContact === 'number' && f.toContact >= 0;
+  }
   return !!f.toAccountID && f.toAccountID !== f.fromID;
+}
+
+function flowRecipient() {
+  const f = ui.flow;
+  if (f.mode === 'etransfer') {
+    if (f.toContact === -1) {
+      return { name: (f.recipientName || '').trim(), email: (f.recipientEmail || '').trim() };
+    }
+    const c = store.contacts[f.toContact] || {};
+    return { name: c.name || 'Contact', email: c.email || '' };
+  }
+  const to = store.accountById(f.toAccountID);
+  return { name: to ? to.name : 'an account', email: '' };
 }
 
 function flowCanProceed() {
@@ -356,22 +379,45 @@ function flowAmountHTML(embedded) {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  const title = f.mode === 'send' ? 'Move money' : 'Top up';
+  const title = f.mode === 'etransfer' ? 'E-Transfer'
+    : (f.mode === 'send' ? 'Move money' : 'Top up');
   let html = '<div class="flow-head"><div class="sheet-title">' + esc(title) + '</div>' +
     (embedded ? '' : '<button class="close-x" data-action="modal-close">✕</button>') + '</div>';
+
+  html += '<div class="seg seg-mint" style="margin-top:12px">' +
+    '<button class="seg-btn' + (f.mode !== 'etransfer' ? ' active' : '') +
+    '" data-action="flow-mode" data-value="send">Between accounts</button>' +
+    '<button class="seg-btn' + (f.mode === 'etransfer' ? ' active' : '') +
+    '" data-action="flow-mode" data-value="etransfer">E-Transfer</button></div>';
 
   html += '<div class="flow-amount"><div class="flow-amount-big' + (amount > 0 ? '' : ' muted') + '">$' +
     esc(f.amountText || '0') + '</div>' +
     '<div class="flow-available">Available ' + currencyString(from ? store.balanceOf(from) : 0) + '</div></div>';
 
-  html += '<div class="form-label" style="margin-top:4px">Move to</div>';
-  html += '<div class="person-chips">';
-  for (const a of store.accounts) {
-    if (a.id === f.fromID) continue;
-    html += '<button class="chip' + (f.toAccountID === a.id ? ' active' : '') +
-      '" data-action="flow-account" data-id="' + a.id + '">💳 ' + esc(a.name) + '</button>';
+  if (f.mode === 'etransfer') {
+    html += '<div class="form-label" style="margin-top:4px">Send to</div>';
+    html += '<div class="person-chips">';
+    store.contacts.forEach(function (c, i) {
+      html += '<button class="chip' + (f.toContact === i ? ' active' : '') +
+        '" data-action="flow-contact" data-index="' + i + '">👤 ' + esc(c.name) + '</button>';
+    });
+    html += '<button class="chip' + (f.toContact === -1 ? ' active' : '') +
+      '" data-action="flow-new-contact">＋ New</button>';
+    html += '</div>';
+    if (f.toContact === -1) {
+      html += '<input class="input" style="margin-top:8px" placeholder="Recipient name" data-input="flow-recipient-name" value="' + esc(f.recipientName) + '">';
+      html += '<input class="input" style="margin-top:8px" autocapitalize="none" placeholder="Email for the notification" data-input="flow-recipient-email" value="' + esc(f.recipientEmail) + '">';
+    }
+  } else {
+    html += '<div class="form-label" style="margin-top:4px">Move to</div>';
+    html += '<div class="person-chips">';
+    for (const a of store.accounts) {
+      if (a.id === f.fromID) continue;
+      html += '<button class="chip' + (f.toAccountID === a.id ? ' active' : '') +
+        '" data-action="flow-account" data-id="' + a.id + '">💳 ' + esc(a.name) + '</button>';
+    }
+    html += '</div>';
   }
-  html += '</div>';
 
   html += '<div class="from-row">🏦 <select data-change="flow-from">' +
     store.accounts.map(function (a) {
@@ -380,7 +426,9 @@ function flowAmountHTML(embedded) {
     }).join('') + '</select></div>';
 
   if (!flowHasRecipient()) {
-    html += '<div class="flow-warning">⚠️ Select the account to move money to</div>';
+    html += '<div class="flow-warning">⚠️ ' + (f.mode === 'etransfer'
+      ? 'Choose who to send the money to'
+      : 'Select the account to move money to') + '</div>';
   }
 
   html += '<div class="keypad">' + keypadHTML() + '</div>';
@@ -397,8 +445,17 @@ function flowContinue() {
   if (!from) message = 'Choose an account to move from.';
   else if (amount <= 0) message = 'Enter an amount greater than $0.';
   else if (amount > store.balanceOf(from)) message = 'Insufficient balance in ' + from.name + '.';
-  else if (!f.toAccountID) message = 'Choose an account.';
-  else if (f.toAccountID === f.fromID) message = 'Choose a different account.';
+  else if (f.mode === 'etransfer') {
+    if (f.toContact === -1) {
+      if ((f.recipientName || '').trim() === '') message = 'Enter the recipient\'s name.';
+      else if ((f.recipientEmail || '').indexOf('@') === -1) message = 'Enter a valid email address.';
+    } else if (!(typeof f.toContact === 'number' && f.toContact >= 0)) {
+      message = 'Choose a recipient.';
+    }
+  } else {
+    if (!f.toAccountID) message = 'Choose an account.';
+    else if (f.toAccountID === f.fromID) message = 'Choose a different account.';
+  }
   if (message) { showToast(message, 'error'); hapticTap('error'); return; }
   f.step = 'confirm';
   render();
@@ -408,36 +465,42 @@ function flowConfirmHTML() {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  const to = store.accountById(f.toAccountID);
-  const recipientName = to ? to.name : 'an account';
+  const isE = f.mode === 'etransfer';
+  const recipient = flowRecipient();
 
   let html = '<div class="flow-head"><div class="sheet-title">Confirm</div>' +
     '<button class="link-btn" data-action="flow-back">Back</button></div>';
 
-  html += '<div class="confirm-hero"><div class="hero-icon">🔁</div>' +
-    '<div class="hero-name">' + esc(recipientName) + '</div>' +
+  html += '<div class="confirm-hero"><div class="hero-icon">' + (isE ? '💸' : '🔁') + '</div>' +
+    '<div class="hero-name">' + esc(recipient.name) + '</div>' +
+    (recipient.email ? '<div class="hero-email">' + esc(recipient.email) + '</div>' : '') +
     '<div class="hero-amount">' + currencyString(amount) + '</div></div>';
 
   html += '<div class="summary-card">';
   html += '<div class="summary-row"><span class="label">From</span><span class="value">' + esc(from ? from.name : '—') + '</span></div>';
-  html += '<div class="summary-row"><span class="label">To</span><span class="value">' + esc(recipientName) + '</span></div>';
+  html += '<div class="summary-row"><span class="label">To</span><span class="value">' + esc(recipient.name) + '</span></div>';
+  if (isE && recipient.email) {
+    html += '<div class="summary-row"><span class="label">Notify</span><span class="value">' + esc(recipient.email) + '</span></div>';
+  }
   html += '<div class="summary-row"><span class="label">Note</span><span class="value">' +
     '<input class="input" style="padding:8px 12px;text-align:right" placeholder="Optional" data-input="flow-note" value="' + esc(f.note) + '"></span></div>';
 
-  html += '<label class="summary-row" style="align-items:center"><span class="label">Remind me again</span>' +
-    '<input type="checkbox" class="switch" data-change="flow-repeat"' + (f.repeatEnabled ? ' checked' : '') + '></label>';
-  if (f.repeatEnabled) {
-    html += '<div><div class="form-label" style="margin-top:0">Frequency</div><div class="seg seg-mint">' +
-      ['Weekly', 'Monthly'].map(function (fr) {
-        return '<button class="seg-btn' + (f.repeatFrequency === fr ? ' active' : '') +
-          '" data-action="flow-freq" data-value="' + fr + '">' + fr + '</button>';
-      }).join('') + '</div>' +
-      '<div class="sheet-footer-note">You\'ll get a reminder when it\'s due — nothing moves automatically.</div></div>';
+  if (!isE) {
+    html += '<label class="summary-row" style="align-items:center"><span class="label">Remind me again</span>' +
+      '<input type="checkbox" class="switch" data-change="flow-repeat"' + (f.repeatEnabled ? ' checked' : '') + '></label>';
+    if (f.repeatEnabled) {
+      html += '<div><div class="form-label" style="margin-top:0">Frequency</div><div class="seg seg-mint">' +
+        ['Weekly', 'Monthly'].map(function (fr) {
+          return '<button class="seg-btn' + (f.repeatFrequency === fr ? ' active' : '') +
+            '" data-action="flow-freq" data-value="' + fr + '">' + fr + '</button>';
+        }).join('') + '</div>' +
+        '<div class="sheet-footer-note">You\'ll get a reminder when it\'s due — nothing moves automatically.</div></div>';
+    }
   }
   html += '<div class="summary-row"><span class="label">Fee</span><span class="value">No fee</span></div>';
   html += '</div>';
 
-  html += '<button class="btn btn-primary btn-full" data-action="flow-confirm">Confirm & move</button>';
+  html += '<button class="btn btn-primary btn-full" data-action="flow-confirm">Confirm & ' + (isE ? 'send' : 'move') + '</button>';
   return html;
 }
 
@@ -445,16 +508,24 @@ function flowConfirm() {
   const f = ui.flow;
   const from = store.accountById(f.fromID);
   const amount = parseFloat(f.amountText) || 0;
-  if (!from || !f.toAccountID) return;
+  if (!from) return;
+  const recipient = flowRecipient();
 
-  f.step = 'success';
-  store.performTransfer(from.id, null, f.toAccountID, amount);
+  if (f.mode === 'etransfer') {
+    if (!recipient.name) return;
+    f.step = 'success';
+    store.performETransfer(from.id, recipient.name, recipient.email, amount);
+  } else {
+    if (!f.toAccountID) return;
+    f.step = 'success';
+    store.performTransfer(from.id, null, f.toAccountID, amount);
 
-  if (f.repeatEnabled) {
-    const title = 'To ' + ((store.accountById(f.toAccountID) || { name: 'account' }).name);
-    store.addRecurringTransfer('transfer', title, from.id, {
-      toAccountID: f.toAccountID, amount: amount, frequency: f.repeatFrequency
-    });
+    if (f.repeatEnabled) {
+      const title = 'To ' + ((store.accountById(f.toAccountID) || { name: 'account' }).name);
+      store.addRecurringTransfer('transfer', title, from.id, {
+        toAccountID: f.toAccountID, amount: amount, frequency: f.repeatFrequency
+      });
+    }
   }
   hapticTap('money');
 }
@@ -462,11 +533,12 @@ function flowConfirm() {
 function flowSuccessHTML() {
   const f = ui.flow;
   const amount = parseFloat(f.amountText) || 0;
-  const recipientName = (store.accountById(f.toAccountID) || { name: 'account' }).name;
+  const isE = f.mode === 'etransfer';
+  const recipient = flowRecipient();
   return '<div class="success-wrap"><div class="big-check">✅</div>' +
-    '<div class="success-title">Money moved</div>' +
-    '<div class="success-sub">' + currencyString(amount) + ' to ' + esc(recipientName) + '</div>' +
-    (f.repeatEnabled
+    '<div class="success-title">' + (isE ? 'E-Transfer sent' : 'Money moved') + '</div>' +
+    '<div class="success-sub">' + currencyString(amount) + ' to ' + esc(recipient.name) + '</div>' +
+    (!isE && f.repeatEnabled
       ? '<div class="success-repeat">Reminds you ' + f.repeatFrequency.toLowerCase() + ' from now on</div>' : '') +
     '<button class="btn btn-primary btn-full" data-action="flow-done">Done</button></div>';
 }
@@ -1441,6 +1513,24 @@ function handleAction(action, ds) {
       hapticTap('tap');
       render();
       break;
+    case 'flow-mode':
+      ui.flow.mode = ds.value === 'etransfer' ? 'etransfer' : 'send';
+      ui.flow.toContact = null;
+      ui.flow.recipientName = '';
+      ui.flow.recipientEmail = '';
+      hapticTap('tap');
+      render();
+      break;
+    case 'flow-contact':
+      ui.flow.toContact = parseInt(ds.index, 10);
+      hapticTap('tap');
+      render();
+      break;
+    case 'flow-new-contact':
+      ui.flow.toContact = -1;
+      hapticTap('tap');
+      render();
+      break;
     case 'flow-continue':
       flowContinue();
       break;
@@ -1603,6 +1693,8 @@ function setInputValue(key, value) {
     case 'signin-confirm': ui.signin.confirm = value; break;
     case 'all-search': ui.allSearch = value; renderFocusAware(); break;
     case 'flow-note': ui.flow.note = value; break;
+    case 'flow-recipient-name': ui.flow.recipientName = value; break;
+    case 'flow-recipient-email': ui.flow.recipientEmail = value; break;
     case 'tx-merchant': ui.modal.data.merchant = value; break;
     case 'schedule-payee-name': ui.modal.data.newPayee = value; break;
     case 'schedule-amount': ui.modal.data.amount = value; break;
@@ -1766,7 +1858,8 @@ function syncUser() {
 }
 
 function syncApiBase() {
-  return (localStorage.getItem(SYNC_KEYS.apiUrl) || '').trim().replace(/\/+$/, '');
+  const fallback = 'https://yetties-api.yettie506.workers.dev';
+  return (localStorage.getItem(SYNC_KEYS.apiUrl) || fallback).trim().replace(/\/+$/, '');
 }
 
 function syncSignedIn() { return !!syncToken() && !!syncUser(); }

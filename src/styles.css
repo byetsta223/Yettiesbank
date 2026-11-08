@@ -80,13 +80,13 @@ input:focus, select:focus, textarea:focus, button:focus { outline: none; }
 .balance-amount { font-size: 38px; font-weight: 800; margin-top: 6px; position: relative; }
 .balance-sub { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 4px; position: relative; }
 
-.qa-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 16px; }
+.qa-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 16px; }
 .qa-btn {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 14px 4px; background: #fff; border-radius: 18px; box-shadow: var(--shadow);
-  font-size: 12px; font-weight: 600;
+  padding: 11px 2px; background: #fff; border-radius: 18px; box-shadow: var(--shadow);
+  font-size: 11px; font-weight: 600;
 }
-.qa-btn .qa-icon { font-size: 19px; }
+.qa-btn .qa-icon { font-size: 17px; }
 
 .section-h { display: flex; align-items: center; justify-content: space-between; margin: 26px 0 12px; }
 .section-h h2 { font-size: 17px; font-weight: 700; }
@@ -252,6 +252,7 @@ input:focus, select:focus, textarea:focus, button:focus { outline: none; }
 .confirm-hero .hero-icon { font-size: 44px; }
 .confirm-hero .hero-name { font-size: 19px; font-weight: 700; margin-top: 8px; }
 .confirm-hero .hero-handle { font-size: 13px; color: var(--subtle); }
+.confirm-hero .hero-email { font-size: 13px; color: var(--subtle); margin-top: 2px; }
 .confirm-hero .hero-amount { font-size: 38px; font-weight: 800; margin-top: 4px; }
 .summary-card { background: #fff; border-radius: 20px; box-shadow: var(--shadow); padding: 18px; margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
 .summary-row { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }

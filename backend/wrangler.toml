@@ -1,0 +1,11 @@
+# Yetties Bank sync server — Cloudflare Worker + D1.
+# Deploy with: npx wrangler deploy
+
+name = "yetties-api"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "yettiebankd1"
+database_id = "cd3f490c-f3a4-4222-b9d9-0925d4375b2d"

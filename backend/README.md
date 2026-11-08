@@ -7,7 +7,8 @@ up automatically and sync across every device you sign in on.
 ## 1. Create the database
 
 1. dash.cloudflare.com → **Storage & Databases → D1** → **Create database**
-2. Name: `yetties-db` → Create
+2. Name: `yettiebankd1` → Create
+   (yours: database id `cd3f490c-f3a4-4222-b9d9-0925d4375b2d`)
 3. Open it → **Console** tab → paste the contents of **schema.sql** → **Run**
 
 ## 2. Create the worker
@@ -16,7 +17,11 @@ up automatically and sync across every device you sign in on.
 2. Open the worker → **Edit code** → delete the starter code → paste the
    full contents of **worker.js** → **Deploy**
 3. Worker → **Settings → Bindings → Add** → type **D1** →
-   variable name: `DB` → database: `yetties-db` → Deploy again if asked
+   variable name: `DB` → database: `yettiebankd1` → Deploy again if asked
+
+Or deploy from a terminal with Wrangler instead: `npx wrangler deploy`
+inside this `backend` folder — **wrangler.toml** already carries the
+name, the worker file and the `DB` binding for `yettiebankd1`.
 
 ## 3. Find your API URL
 
